@@ -11,11 +11,10 @@ from ase.io import read
 
 ## Utils.
 from utils import parse_lammps_dump
-
-class PlaceHolderSeriesError(Exception):
-    pass
-class BaseSeriesReaderError(Exception):
-    pass
+from exception import (
+    PlaceHolderSeriesError,
+    BaseSeriesReaderError,
+)
 
 class PlaceholderSeries:
     """
@@ -44,7 +43,7 @@ class PlaceholderSeries:
         self.pattern = pattern
         self.placeholder = placeholder
         if pattern.count(placeholder) != 1:
-            raise ValueError(
+            raise PlaceHolderSeriesError(
                 f"Pattern must contain exactly one placeholder "
                 f"('{placeholder}')."
             )

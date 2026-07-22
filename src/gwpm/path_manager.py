@@ -10,27 +10,12 @@ import pickle
 
 from utils import variable_to_string
 from series_reader import PlaceholderSeries,BaseSeriesReader
-
-## Error classes
-class GWPMError(Exception):
-    """Base exception for all GWPM errors."""
-    pass
-class ReferenceResolutionError(GWPMError):
-    """Raised when a ReferenceVariable cannot be resolved."""
-    pass
-class ReplacerConfigurationError(GWPMError):
-    """Raised for invalid replacer configurations."""
-    pass
-class DependencyLoopError(GWPMError):
-    """Raised when recursive replacer dependencies form a loop."""
-    pass
-class PathResolutionError(GWPMError):
-    """Raised when path generation fails."""
-    pass
-class SerializationError(GWPMError):
-    """Raised during save/load operations."""
-    pass
-#####
+from exception import (
+    ReplacerConfigurationError,
+    ReferenceResolutionError,
+    PathResolutionError,
+    DependencyLoopError,
+)
 
 @dataclass
 class ReferenceVariable():

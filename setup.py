@@ -3,7 +3,7 @@ from pathlib import Path
 
 # See https://packaging.python.org/guides/single-sourcing-package-version/
 version_dict = {}
-with open(Path(__file__).parents[0] / "src/gwpm/_version.py") as fp:
+with open(Path(__file__).parents[0] / "src/_version.py") as fp:
     exec(fp.read(), version_dict)
 version = version_dict["__version__"]
 del version_dict
