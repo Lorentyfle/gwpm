@@ -1,6 +1,6 @@
 import pytest
 
-from src.gwpm.path_manager import (
+from Scripts.gwpm.src.path_manager import (
     GeneralWorkPathManager,
     ReferenceVariable,
 )

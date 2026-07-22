@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from Scripts.gwpm.src.gwpm.series_reader import (
+from Scripts.gwpm.src.series_reader import (
     PlaceholderSeries,
     BaseSeriesReader,
     CSVReader,
