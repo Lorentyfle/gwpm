@@ -8,8 +8,8 @@ import json
 import pickle
 
 
-from gwpm.utils import variable_to_string
-from gwpm.series_reader import PlaceholderSeries,BaseSeriesReader
+from utils import variable_to_string
+from series_reader import PlaceholderSeries,BaseSeriesReader
 
 ## Error classes
 class GWPMError(Exception):

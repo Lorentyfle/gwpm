@@ -10,7 +10,7 @@ from ase import Atoms
 from ase.io import read
 
 ## Utils.
-from gwpm.utils import parse_lammps_dump
+from utils import parse_lammps_dump
 
 class PlaceHolderSeriesError(Exception):
     pass

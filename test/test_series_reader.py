@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from Scripts.gwpm.src.series_reader import (
+from gwpm.src.series_reader import (
     PlaceholderSeries,
     BaseSeriesReader,
     CSVReader,
@@ -10,7 +10,7 @@ from Scripts.gwpm.src.series_reader import (
 )
 ### ASE reader test using ASE for testing.
 from unittest.mock import patch
-from ml_dft_gw.gw.paths.series_reader import ASEReader
+from gwpm.src.series_reader import ASEReader
 # ==========================================================
 # PlaceholderSeries
 # ==========================================================
