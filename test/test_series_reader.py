@@ -6,15 +6,26 @@ from gwpm import (
     CSVReader,
     FunctionReader,
     LammpsLogReader,
+    LammpsDumpReader,
     ThermoLogReader,
     PlaceHolderSeriesError
 )
 ### ASE reader test using ASE for testing.
 from unittest.mock import patch
+from ase import Atoms
 from gwpm import ASEReader
 # ==========================================================
 # PlaceholderSeries
 # ==========================================================
+def test_placeholder_series_values_missing_folder(tmp_path):
+    series = PlaceholderSeries(str(tmp_path / "does_not_exist" / "[.txt"))
+    assert series.values == []
+class DummyReader(BaseSeriesReader):
+    def read(self, path):
+        return path
+def test_base_series_reader_repr():
+    reader = DummyReader()
+    assert repr(reader) == "DummyReader()"
 def test_placeholder_series_creation(tmp_path):
     series = PlaceholderSeries(
         str(tmp_path / "[.txt")
@@ -151,16 +162,62 @@ def test_placeholder_series_equality():
 
     assert s1 == s2
     assert s1 != s3
+def test_placeholder_series_repr(tmp_path):
+    series = PlaceholderSeries(
+        str(tmp_path / "[.txt")
+    )
+    result = repr(series)
+    assert "PlaceholderSeries" in result
+    assert "pattern=" in result
+def test_placeholder_series_str(tmp_path):
+    series = PlaceholderSeries(
+        str(tmp_path / "[.txt")
+    )
+
+    text = str(series)
+
+    assert "PlaceholderSeries" in text
+    assert "pattern" in text
+    assert "folder" in text
+    assert "width" in text
+    assert "n_values" in text
+def test_placeholder_series_getitem(tmp_path):
+    (tmp_path / "001.txt").touch()
+    series = PlaceholderSeries(
+        str(tmp_path / "[.txt")
+    )
+    assert series[0] == 1
+def test_placeholder_series_eq_returns_false_for_other_object():
+    series = PlaceholderSeries("./[.txt")
+    assert series.__eq__(123) is False
 # ==========================================================
 # Base Reader
 # ==========================================================
 class DummyReader(BaseSeriesReader):
-
+    def read(self, path):
+        return path
+def test_base_series_reader_str():
+    reader = DummyReader()
+    assert str(reader) == "DummyReader()"
+class DummyReader(BaseSeriesReader):
+    def read(self, path):
+        return path
+def test_base_series_reader_abstract_read():
+    reader = DummyReader()
+    assert BaseSeriesReader.read(reader, "some_path") is None
+class DummyReader(BaseSeriesReader):
     def read(self, path):
         return path.upper()
 def test_base_reader_read_all(tmp_path):
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000002.txt").touch()
+class DummyReader(BaseSeriesReader):
+    def read(self, path):
+        return path
+def test_base_series_reader_merge():
+    reader = DummyReader()
+    data = [1, 2, 3]
+    assert reader.merge(data) == data
 ### CSV reader test
 def test_csv_reader_kwargs(tmp_path):
 
@@ -187,6 +244,13 @@ def test_csv_reader_str():
     reader = CSVReader()
 
     assert str(reader) == repr(reader)
+def test_csv_reader_merge():
+    reader = CSVReader()
+    result = reader.merge([
+        pd.DataFrame({"x": [1]}),
+        pd.DataFrame({"x": [2]}),
+        ])
+    assert len(result) == 2
 ## Function reader test
 def test_function_reader_repr():
 
@@ -211,6 +275,60 @@ def test_function_reader_lambda():
     )
 
     assert reader.read(4) == 8
+### Lammpsdumpreader
+def test_lammps_dump_reader_init_custom_arguments():
+    reader = LammpsDumpReader(
+        Z_of_type={"a": "b"},
+        index_atom=0,
+    )
+    assert reader.Z_of_type == {"a": "b"}
+    assert reader.index_atom == 0
+def test_lammps_dump_reader_repr():
+    reader = LammpsDumpReader(
+        Z_of_type={1: "Li"},
+        index_atom=":"
+    )
+
+    text = repr(reader)
+
+    assert "LammpsDumpReader" in text
+    assert "Li" in text
+def test_lammps_dump_reader_str():
+    reader = LammpsDumpReader(
+        Z_of_type={1: "Li"},
+        index_atom=-1,
+    )
+
+    assert str(reader) == repr(reader)
+def test_lammps_dump_reader_read():
+    with patch(
+        "gwpm.series_reader.parse_lammps_dump",
+        return_value=["dummy"]
+    ) as mock:
+
+        reader = LammpsDumpReader(
+            Z_of_type={1: "Li"},
+            index_atom=-1,
+        )
+
+        result = reader.read("dump.lammpstrj")
+
+        mock.assert_called_once_with(
+            "dump.lammpstrj",
+            {1: "Li"},
+            -1,
+        )
+
+        assert result == ["dummy"]
+def test_lammps_dump_reader_merge():
+    reader = LammpsDumpReader()
+
+    merged = reader.merge([
+        [Atoms("H")],
+        [Atoms("He")],
+    ])
+
+    assert len(merged) == 2
 ### LAMMPSLOGREADER
 def test_function_reader_lambda():
 
