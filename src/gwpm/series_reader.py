@@ -10,8 +10,8 @@ from ase import Atoms
 from ase.io import read
 
 ## Utils.
-from utils import parse_lammps_dump
-from exception import (
+from .utils import parse_lammps_dump
+from .exception import (
     PlaceHolderSeriesError,
     BaseSeriesReaderError,
 )

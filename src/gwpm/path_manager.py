@@ -8,9 +8,9 @@ import json
 import pickle
 
 
-from utils import variable_to_string
-from series_reader import PlaceholderSeries,BaseSeriesReader
-from exception import (
+from .utils import variable_to_string
+from .series_reader import PlaceholderSeries,BaseSeriesReader
+from .exception import (
     ReplacerConfigurationError,
     ReferenceResolutionError,
     PathResolutionError,

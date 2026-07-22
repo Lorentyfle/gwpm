@@ -7,6 +7,7 @@ from gwpm import (
     FunctionReader,
     LammpsLogReader,
     ThermoLogReader,
+    PlaceHolderSeriesError
 )
 ### ASE reader test using ASE for testing.
 from unittest.mock import patch
@@ -22,7 +23,7 @@ def test_placeholder_series_creation(tmp_path):
     assert series.placeholder == "["
     assert series.folder == str(tmp_path)
 def test_placeholder_series_invalid_placeholder_count():
-    with pytest.raises(ValueError):
+    with pytest.raises(PlaceHolderSeriesError):
         PlaceholderSeries("[_[.txt")
 def test_placeholder_series_empty_directory(tmp_path):
     series = PlaceholderSeries(
@@ -390,7 +391,7 @@ def test_ase_reader_str():
     reader = ASEReader(index="::5")
 
     assert str(reader) == repr(reader)
-@patch("ml_dft_gw.gw.paths.series_reader.read")
+@patch("gwpm.series_reader.read")
 def test_ase_reader_read(mock_read):
 
     fake_atoms = ["atoms"]
@@ -435,7 +436,7 @@ def test_ase_reader_merge_empty():
     merged = reader.merge([])
 
     assert merged == []
-@patch("ml_dft_gw.gw.paths.series_reader.read")
+@patch("gwpm.series_reader.read")
 def test_ase_reader_read_all(mock_read, tmp_path):
 
     (tmp_path / "000001.xyz").touch()
@@ -454,7 +455,7 @@ def test_ase_reader_read_all(mock_read, tmp_path):
     assert len(result) == 2
 
     assert mock_read.call_count == 2
-@patch("ml_dft_gw.gw.paths.series_reader.read")
+@patch("gwpm.series_reader.read")
 def test_ase_reader_read_merged(mock_read, tmp_path):
 
     (tmp_path / "000001.xyz").touch()

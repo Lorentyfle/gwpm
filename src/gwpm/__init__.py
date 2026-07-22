@@ -11,12 +11,10 @@ from ._version import __version__
 from .path_manager import (
     GeneralWorkPathManager,
     ReferenceVariable,
-    GWPMError,
     ReferenceResolutionError,
     ReplacerConfigurationError,
     DependencyLoopError,
     PathResolutionError,
-    SerializationError,
 )
 
 # Series API
@@ -31,6 +29,16 @@ from .series_reader import (
     ThermoLogReader,
     PlaceHolderSeriesError,
     BaseSeriesReaderError,
+)
+
+from .exception import (
+    GWPMError,
+    PathResolutionError,
+    ReferenceResolutionError,
+    ReplacerConfigurationError,
+    DependencyLoopError,
+    SerializationError,
+    PlaceHolderSeriesError,
 )
 
 __all__ = [
