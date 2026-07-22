@@ -31,6 +31,12 @@ from .series_reader import (
     BaseSeriesReaderError,
 )
 
+from .utils import (
+    check_folder,
+    variable_to_string
+)
+
+
 from .exception import (
     GWPMError,
     PathResolutionError,

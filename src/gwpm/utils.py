@@ -1,6 +1,7 @@
 from typing import List, Union, Dict, Optional
 import warnings
 
+import os
 import numpy as np
 from numpy import ndarray
 # ASE.
@@ -157,6 +158,12 @@ def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, 
             #
     return atom_array
 ########
+def check_folder(folder: str):
+    """Function that checks if the folder exist, if it doesn't create one."""
+    if not os.path.isdir(folder):
+        os.makedirs(folder)
+        print("Creating folder(s) following " + folder)
+
 def variable_to_string(
     variable,
     mode: str = None,
@@ -261,12 +268,12 @@ def variable_to_string(
                 if i != len(variable) - 1:
                     tmp = tmp + column_sep
             return tmp
-
-    if isinstance(variable, bool) and (mode.upper() == "F90" or mode.upper() == "VASP"):
-        if variable:
-            return ".TRUE."
-        else:
-            return ".FALSE."
+    if (
+        isinstance(variable, bool)
+        and isinstance(mode, str)
+        and mode.upper() in {"F90", "VASP"}
+    ):
+        return ".TRUE." if variable else ".FALSE."
     if isinstance(variable, bool):
         return str(variable)
 
@@ -290,7 +297,7 @@ def variable_to_string(
             if int(exponent) < 0:
                 str_var = format(variable, ".{}f".format(abs(int(exponent))))
             else:
-                str_var = format(variable, "{}.f".format(abs(int(exponent))))
+                str_var = format(variable, ".{}f".format(abs(int(exponent))))
             #
             if float_trail:
                 int_part, float_part = str_var.split(
@@ -303,16 +310,7 @@ def variable_to_string(
                 trail_zero = str_var
             return trail_zero
         elif variable == int(variable) or float_trail:
-            # Float with in and float part
-            if len(str(variable).split(".")) == 1:
-                # Raising error if the lenght is not good.
-                raise ValueError(
-                    "Variable too short for a float split: {} or the list {}".format(
-                        variable, str(variable).split(".")
-                    )
-                )
-            else:
-                int_part, float_part = str(variable).split(".")
+            int_part, float_part = str(variable).split(".")
             #
             lead_zero = "{:0>{}}".format(int_part, leading_zero)
             trail_zero = "{}.{:0<{}}".format(lead_zero, float_part, trailing_zero)
