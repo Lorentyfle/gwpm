@@ -127,7 +127,7 @@ class GeneralWorkPathManager():
     >>> gwpm.path_conversion([0, 1])
     './Li/600K/'
     """
-    __version__ : str = "1.3.0"
+    __version__ : str = "1.4.0"
     def __init__(
         self,
         list_of_variables: List[Union[List[Any],ReferenceVariable]],
@@ -139,24 +139,24 @@ class GeneralWorkPathManager():
         verbose: bool = False,
         )->None:
         if replacer is None:
-            raise ValueError("Replacer must be given.")
+            raise ReplacerConfigurationError("Replacer must be given.")
         if len(set(replacer)) != len(replacer):
-            raise ValueError("Replacers must be unique.")
+            raise ReplacerConfigurationError("Replacers must be unique.")
         if len(list_of_variables) == 1:
             replacer = [replacer[0]]
         if len(list_of_variables) != len(replacer):
-            raise IndexError("The list of variables in the folder tree must be the same as the one of the replacer.")
+            raise PathResolutionError("The list of variables in the folder tree must be the same as the one of the replacer.")
         for i, variable in enumerate(list_of_variables):
             if isinstance(variable,ReferenceVariable):
                 ref = variable.reference_position
                 if ref < 0:
                     ref = i + ref
                 if ref < 0 or ref >= len(list_of_variables):
-                    raise IndexError("ReferenceVariable cannot reference itself.")
+                    raise ReplacerConfigurationError("ReferenceVariable cannot reference itself.")
                 if ref == i:
-                    raise ValueError("ReferenceVariable cannot reference itself.")
+                    raise ReplacerConfigurationError("ReferenceVariable cannot reference itself.")
                 if ref > i:
-                    raise ValueError(
+                    raise ReplacerConfigurationError(
                         "ReferenceVariable must reference a previous variable."
                     )
                 variable.reference_position = ref
@@ -165,16 +165,15 @@ class GeneralWorkPathManager():
                 f"var_{i}"
                 for i in range(len(list_of_variables))
             ]
-        self.list_of_variables  = list_of_variables
-        self.replacer           = replacer
-        self.variable_names     = variable_names
-        self.general_path       = path
-        ### I want this to become a Path object, and be setup once all replacements are done like this it works through all the OSes.
-        self.current_path       = path
-        self.current_path_file  = path + file
-        self.file               = file
-        self.output_folder      = output_folder
-        self.verbose            = verbose
+        self.list_of_variables : List[Union[List[Any],ReferenceVariable]] = list_of_variables
+        self.replacer          : List[str]      = replacer
+        self.variable_names    : List[str]      = variable_names
+        self.general_path      : str            = path
+        self.current_path      : Optional[Path] = None
+        self.current_path_file : Optional[Path] = None
+        self.file              : str            = file
+        self.output_folder     : str            = output_folder
+        self.verbose           : bool           = verbose
         if self.file.lower() == "none":
             self.file = ""
         if verbose:
@@ -240,13 +239,13 @@ class GeneralWorkPathManager():
         """
         return list(zip(self.replacer,self.list_of_variables))
     @property
-    def current(self)->Dict[str,str]:
+    def current(self)->Dict[str,Optional[Path]]:
         """
         Return the most recently resolved path information.
 
         Returns
         -------
-        Dict[str, str]
+        Dict[str, Optional[Path]]
             Dictionary containing:
 
             ``path``
@@ -487,7 +486,7 @@ class GeneralWorkPathManager():
 
         Raises
         ------
-        KeyError
+        PathResolutionError
             If required keys are missing or the dictionary keys do not
             match the manager configuration.
         """
@@ -681,9 +680,8 @@ class GeneralWorkPathManager():
 
         Raises
         ------
-        IndexError
-            If a ``ReferenceVariable`` points to a valid variable but the
-            resolved nested index does not exist.
+        ReferenceResolutionError
+            If a ``ReferenceVariable`` cannot be resolved for the supplied indices.
 
         Examples
         --------
@@ -743,7 +741,7 @@ class GeneralWorkPathManager():
             
         Returns
         -------
-        str
+        Path
             The resolved `self.current_path_file` or resolved `path_file`.
         """
         index = self._normalize_index(index)
@@ -751,42 +749,20 @@ class GeneralWorkPathManager():
             raise PathResolutionError(
                 f"Expected {len(self.list_of_variables)} indices, "
                 f"received {len(index)}."
-            )
-        if immutable:
-            path = ""
-            path_file = ""
-            if starter is not None:
-                path += starter
-            path += self.general_path
-            if is_out:
-                path += self.output_folder
-            path_file = path + self.file
-            variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
-            if recursive:
-                self._check_loop_replacers()
-                path_file = self._resolve_recursive(path_file, variables)
-            else:
-                path_file = self._apply_replacements(path_file, variables)
-            return path_file
-        # Reinitialisation
-        self.current_path = ""
-        self.current_path_file = ""
-        if starter is not None:
-            self.current_path += starter
-        self.current_path += self.general_path
-        if is_out:
-            self.current_path += self.output_folder
-        self.current_path_file = self.current_path + self.file
-        # Take data
+                ) 
+        path, path_file = self._build_path(starter=starter,is_out=is_out)
         variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
-        # Replacing
         if recursive:
             self._check_loop_replacers()
-            self.current_path = self._resolve_recursive(self.current_path,variables)
-            self.current_path_file = self._resolve_recursive(self.current_path_file, variables)
+            path        =self._resolve_recursive(path, variables)
+            path_file   = self._resolve_recursive(path_file, variables)
         else:
-            self.current_path = self._apply_replacements(self.current_path,variables)
-            self.current_path_file = self._apply_replacements(self.current_path_file, variables)
+            path        = self._apply_replacements(path, variables)
+            path_file   = self._apply_replacements(path_file, variables)
+        if immutable:
+            return Path(path_file)
+        self.current_path       = Path(path) 
+        self.current_path_file  = Path(path_file)
         return self.current_path_file
     def path_manual_conversion(
         self,
@@ -819,60 +795,33 @@ class GeneralWorkPathManager():
             
         Returns
         -------
-        str
+        Path
             The resolved `self.current_path_file` or resolved `path_file`.
         """
         if len(list_of_var) != len(self.list_of_variables):
-            raise IndexError(
+            raise PathResolutionError(
                 f"Expected {len(self.list_of_variables)} indices, "
                 f"received {len(list_of_var)}."
             )
-        if immutable:
-            path = ""
-            path_file = ""
-            if starter is not None:
-                path += starter
-            path += self.general_path
-            if is_out:
-                path += self.output_folder
-            path_file = path + self.file
-            if recursive:
-                self._check_loop_replacers([[v] for v in list_of_var])
-                path_file = self._resolve_recursive(path_file, list_of_var)
-            else:
-                path_file = self._apply_replacements(path_file, list_of_var)
-            return path_file
-        # Reinitialisation
-        self.current_path = ""
-        self.current_path_file = ""
-        if len(list_of_var) != len(self.replacer):
-            raise PathResolutionError(
-                "The list of variables in the folder tree must be the same as the one of the replacer."
-            )
-        if starter is not None:
-            self.current_path += starter
-        self.current_path += self.general_path
-        if is_out:
-            self.current_path += self.output_folder
-        if output_file is not None:
-            self.current_path_file = self.current_path + output_file
-        else:
-            self.current_path_file = self.current_path + self.file
-        # Replacing
+        path, path_file = self._build_path(starter=starter,is_out=is_out,output_file=output_file)
         if recursive:
             self._check_loop_replacers([[v] for v in list_of_var])
-            self.current_path = self._resolve_recursive(self.current_path, list_of_var)
-            self.current_path_file = self._resolve_recursive(self.current_path_file, list_of_var)
+            path        = self._resolve_recursive(path,list_of_var)
+            path_file   = self._resolve_recursive(path_file, list_of_var)
         else:
-            self.current_path = self._apply_replacements(self.current_path, list_of_var)
-            self.current_path_file = self._apply_replacements(self.current_path_file, list_of_var)
+            path        = self._apply_replacements(path,list_of_var)
+            path_file   = self._apply_replacements(path_file, list_of_var)
+        if immutable:
+            return Path(path_file)
+        self.current_path       = Path(path) 
+        self.current_path_file  = Path(path_file)
         return self.current_path_file
     def path_general_conversion(
             self,
             g_path:str,
             g_file:str,
             index: Union[List[int],Dict[str,int]]
-            )->Dict[ str, List[str] ]:
+            )->Dict[ str, Any ]:
         """
         Apply a single replacement pass to a given path/file string.
 
@@ -913,6 +862,9 @@ class GeneralWorkPathManager():
         ValueError
             If the replacer/variable configuration contains a dependency
             loop (see `_check_loop_replacers`).
+        Raises
+        ------
+        DependencyLoopError
         """
         index = self._normalize_index(index)
         self._check_loop_replacers()
@@ -936,7 +888,7 @@ class GeneralWorkPathManager():
 
         Raises
         ------
-        ValueError
+        PathResolutionError
             If the provided path does not match the template defined
             by this manager.
 
@@ -976,11 +928,7 @@ class GeneralWorkPathManager():
         Raises
         ------
         KeyError
-            If a required variable is missing.
-
-        ValueError
-            If a supplied value does not exist in the corresponding
-            variable list.
+        PathResolutionError
 
         Examples
         --------
@@ -993,18 +941,25 @@ class GeneralWorkPathManager():
         if values is None:
             values = {}
         values.update(kwargs)
-        resolved_values = []
+        indices = []
         for name, variable in zip(self.variable_names,self.list_of_variables):
             if name not in values:
                 raise KeyError(f"Missing variable '{name}'.")
             value = values[name]
-            if isinstance(value,int):
-                resolved_values.append(variable[value])
+            if isinstance(value, int):
+                indices.append(value)
             else:
-                if value not in variable:
-                    raise PathResolutionError(f"{value} not available for {name}.")
-                resolved_values.append(value)        
-        return Path(self._apply_replacements(self.general_path+self.file,resolved_values))
+                if isinstance(variable, ReferenceVariable):
+                    raise PathResolutionError(
+                        f"ReferenceVariable '{name}' must "
+                        f"be resolved using indices.")
+                try:
+                    indices.append(variable.index(value))
+                except ValueError as exc:
+                    raise PathResolutionError(
+                        f"{value} not available for {name}."
+                    ) from exc
+        return self.path_conversion(indices,immutable=True)
     ################################
     ### Get the data from the gwpm.
     def get_placeholder_series(
@@ -1033,17 +988,16 @@ class GeneralWorkPathManager():
         PlaceholderSeries
             Series object configured from the current path template.
         """
-        path = ""
         if use_current:
-            path += self.current_path_file
+            if self.current_path_file is None:
+                raise PathResolutionError("No current path available.")
+            path_file = str(self.current_path_file)
         else:
-            if starter is not None:
-                path += starter
-            path += self.general_path
-            if is_out:
-                path += self.output_folder
-            path += self.file
-        return PlaceholderSeries(path,placeholder=placeholder,)
+            _, path_file = self._build_path(
+                starter=starter,
+                is_out=is_out,
+            )
+        return PlaceholderSeries(path_file,placeholder=placeholder,)
     def read_placeholder_series(
         self,
         reader:BaseSeriesReader,
