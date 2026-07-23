@@ -13,13 +13,18 @@ from gwpm import (
 ### ASE reader test using ASE for testing.
 from unittest.mock import patch
 from ase import Atoms
-from gwpm import ASEReader
+from gwpm import ASEReader, PymatgenReader
 ## Import tests.
 def test_require_ase(monkeypatch):
     import gwpm.series_reader as sr
     monkeypatch.setattr(sr, "read", None)
     with pytest.raises(ImportError):
         sr._require_ase()
+def test_require_pymatgen(monkeypatch):
+    import gwpm.series_reader as sr
+    monkeypatch.setattr(sr, "Structure", None)
+    with pytest.raises(ImportError):
+        sr._require_pymatgen()
 # ==========================================================
 # PlaceholderSeries
 # ==========================================================
@@ -603,4 +608,115 @@ def test_ase_reader_read_merged(mock_read, tmp_path):
         "b",
         "c",
     ]
+### PymatgenReader
+def test_pymatgen_reader_init():
+
+    def dummy_reader(path):
+        return path
+
+    reader = PymatgenReader(dummy_reader)
+
+    assert reader.read_function is dummy_reader
+    assert reader.kwargs == {}
+def test_pymatgen_reader_init_kwargs():
+
+    def dummy_reader(path, primitive=False):
+        return primitive
+
+    reader = PymatgenReader(
+        dummy_reader,
+        primitive=True,
+    )
+
+    assert reader.kwargs == {"primitive": True}
+def test_pymatgen_reader_non_callable():
+
+    with pytest.raises(TypeError):
+        PymatgenReader("not_callable")
+def test_pymatgen_reader_repr():
+
+    def dummy_reader(path):
+        return path
+
+    reader = PymatgenReader(dummy_reader)
+
+    assert (
+        repr(reader)
+        == "PymatgenReader(read_function='dummy_reader', kwargs={})"
+    )
+def test_pymatgen_reader_str():
+
+    def dummy_reader(path):
+        return path
+
+    reader = PymatgenReader(dummy_reader)
+
+    assert str(reader) == repr(reader)
+def test_pymatgen_reader_read():
+
+    def dummy_reader(path):
+        return f"reading:{path}"
+
+    reader = PymatgenReader(dummy_reader)
+
+    assert reader.read("file.cif") == "reading:file.cif"
+def test_pymatgen_reader_read_kwargs():
+
+    def dummy_reader(path, primitive=False):
+        return {
+            "path": path,
+            "primitive": primitive,
+        }
+
+    reader = PymatgenReader(
+        dummy_reader,
+        primitive=True,
+    )
+
+    result = reader.read("test.cif")
+
+    assert result == {
+        "path": "test.cif",
+        "primitive": True,
+    }
+def test_pymatgen_reader_merge():
+
+    def dummy_reader(path):
+        return path
+
+    reader = PymatgenReader(dummy_reader)
+
+    data = ["a", "b", "c"]
+
+    assert reader.merge(data) == data
+def test_pymatgen_reader_read_all():
+    class DummySeries:
+        paths = [
+            "file_1",
+            "file_2",
+            "file_3",
+        ]
+    def dummy_reader(path):
+        return path.upper()
+    reader = PymatgenReader(dummy_reader)
+    assert reader.read_all(DummySeries()) == [
+        "FILE_1",
+        "FILE_2",
+        "FILE_3",
+    ]
+def test_pymatgen_reader_read_merged():
+    class DummySeries:
+        paths = [
+            "file_1",
+            "file_2",
+        ]
+    def dummy_reader(path):
+        return path.upper()
+    reader = PymatgenReader(dummy_reader)
+
+    assert reader.read_merged(DummySeries()) == [
+        "FILE_1",
+        "FILE_2",
+    ]
+
 

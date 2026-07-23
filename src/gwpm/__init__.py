@@ -23,6 +23,7 @@ from .series_reader import (
     BaseSeriesReader,
     CSVReader,
     ASEReader,
+    PymatgenReader,
     LammpsDumpReader,
     LammpsLogReader,
     FunctionReader,

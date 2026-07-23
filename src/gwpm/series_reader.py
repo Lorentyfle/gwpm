@@ -10,10 +10,15 @@ import pandas as pd
 ## ASE
 if TYPE_CHECKING:
     from ase import Atoms
+    from pymatgen.core import Structure
 try:
     from ase.io import read
 except ImportError: # pragma: no cover
     read = None
+try:
+    from pymatgen.core import Structure
+except ImportError: # pragma: no cover
+    Structure = None
 
 ## Utils.
 from .utils import parse_lammps_dump
@@ -26,6 +31,12 @@ def _require_ase():
         raise ImportError(
             "ASE is required. "
             "Install with pip install gwpm[structures]"
+        )
+def _require_pymatgen():
+    if Structure is None:
+        raise ImportError(
+            "Pymatgen support is not installed. "
+            "Install with: pip install gwpm[structures]"
         )
 
 class PlaceholderSeries:
@@ -698,3 +709,56 @@ class ThermoLogReader(BaseSeriesReader):
                 df["step"] += last_step
             result = pd.concat([result, df],ignore_index=True,)
         return result
+class PymatgenReader(FunctionReader):
+    """
+    Reader wrapper for pymatgen file readers.
+
+    Any pymatgen reader function may be supplied, for example
+    ``Structure.from_file`` or ``Molecule.from_file``.
+    """
+    def __init__(
+        self,
+        read_function,
+        **kwargs,) -> None:
+        """
+        Parameters
+        ----------
+        read_function : callable
+            Pymatgen reader function used to load a file.
+
+        **kwargs
+            Additional keyword arguments passed to
+            ``read_function``.
+        """
+        _require_pymatgen()
+        if not callable(read_function):
+            raise TypeError("read_function must be callable.")
+        super().__init__(read_function)
+        self.kwargs = kwargs
+    def __repr__(self) -> str:
+        name = getattr(self.read_function, "__name__", "anonymous")
+        return (
+            f"PymatgenReader("
+            f"read_function='{name}', "
+            f"kwargs={self.kwargs})"
+        )
+    def __str__(self) -> str:
+        return self.__repr__()
+    def read(self, path: str):
+        """
+        Read a file using the selected pymatgen reader.
+
+        Parameters
+        ----------
+        path : str
+            Path to the file.
+
+        Returns
+        -------
+        Any
+            Object returned by the pymatgen reader.
+        """
+        return self.read_function(
+            path,
+            **self.kwargs,
+        )
