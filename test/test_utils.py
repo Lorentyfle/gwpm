@@ -159,9 +159,6 @@ def test_variable_to_string_float_integer():
         float_trail=True,
         trailing_zero=3,
     ) == "1.000"
-def test_variable_to_string_float_positive_exponent():
-    result = variable_to_string(2e5)
-    assert result == "200000.0"
 def test_variable_to_string_scientific_no_float_trail():
     result = variable_to_string(1e-5)
 
@@ -190,9 +187,25 @@ def test_variable_to_string_float_non_integer():
     result = variable_to_string(1.23)
 
     assert result == "1.23"
-def test_variable_to_string_positive_exponent_branch():
-    result = variable_to_string(1e20)
-    assert result == "100000000000000000000.00000000000000000000"
+def test_variable_to_string_large_positive_exponent_keeps_e():
+    result = variable_to_string(5e20)
+    assert result == "5e+20"
+def test_variable_to_string_large_negative_exponent_keeps_e():
+    result = variable_to_string(5e-20)
+    assert result == "5e-20"
+def test_variable_to_string_negative_exponent_branch():
+    """Covers exponent < 0 branch."""
+    result = variable_to_string(1e-3)
+    assert result == "0.001"
+def test_variable_to_string_non_exponential_float():
+    """Covers float branch without 'e' in string representation."""
+    result = variable_to_string(10**0.5)
+    assert result == str(10**0.5)
+def test_variable_to_string_integer():
+    """Covers non-float branche."""
+    result = variable_to_string(1000)
+    assert result == "1000"
+
 #### litteral_string
 def test_litteral_str_already_quoted():
     assert litteral_str("'abc'") == "'abc'"

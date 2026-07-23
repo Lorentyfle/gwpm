@@ -294,10 +294,12 @@ def variable_to_string(
         # Float with exponent
         if str(variable).__contains__("e"):
             _, exponent = str(variable).split("e")
-            if int(exponent) < 0:
-                str_var = format(variable, ".{}f".format(abs(int(exponent))))
+            if abs(int(exponent)) > 10:
+                str_var = str(variable) # keep scientific notation (the exponent is too big).
+            elif int(exponent) < 0:
+                str_var = format(variable, f".{abs(int(exponent))}f")
             else:
-                str_var = format(variable, ".{}f".format(abs(int(exponent))))
+                str_var = format(variable, ".1f")
             #
             if float_trail:
                 int_part, float_part = str_var.split(
