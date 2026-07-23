@@ -1,7 +1,3 @@
-![Tests]
-![Coverage]
-![Python]
-![License]
 # gwpm — GeneralWorkPathManager
 
 This library aims to provide a common and reusable way to manage path templates, while remaining straightforward, lightweight, and robust.
