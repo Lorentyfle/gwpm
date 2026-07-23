@@ -37,7 +37,7 @@ def test_reference_variable_negative_reference():
         [["a"]],
         -1,
     )
-    gwpm = GeneralWorkPathManager(
+    GeneralWorkPathManager(
         [["x"], rv],
         placeholders=["?", "!"],
     )
@@ -347,7 +347,7 @@ def test_to_dict_from_dict():
 
 def test_to_dict_reference_variable():
     with pytest.raises(ReplacerConfigurationError):
-        gwpm = GeneralWorkPathManager(
+        GeneralWorkPathManager(
             [["300K", "500K"], ReferenceVariable([["fcc"]], 2), ["O"]],
             placeholders=["?", "!", "$"],
         )

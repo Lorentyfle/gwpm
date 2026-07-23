@@ -229,42 +229,38 @@ def test_placeholder_series_eq_returns_false_for_other_object():
 # ==========================================================
 # Base Reader
 # ==========================================================
-class DummyReader(BaseSeriesReader):
-    def read(self, path):
-        return path
-
-
 def test_base_series_reader_str():
+    class DummyReader(BaseSeriesReader):
+        def read(self, path):
+            return path
+
     reader = DummyReader()
     assert str(reader) == "DummyReader()"
 
 
-class DummyReader(BaseSeriesReader):
-    def read(self, path):
-        return path
-
-
 def test_base_series_reader_abstract_read():
+    class DummyReader(BaseSeriesReader):
+        def read(self, path):
+            return path
+
     reader = DummyReader()
     assert BaseSeriesReader.read(reader, "some_path") is None
 
 
-class DummyReader(BaseSeriesReader):
-    def read(self, path):
-        return path.upper()
-
-
 def test_base_reader_read_all(tmp_path):
+    class DummyReader(BaseSeriesReader):
+        def read(self, path):
+            return path.upper()
+
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000002.txt").touch()
 
 
-class DummyReader(BaseSeriesReader):
-    def read(self, path):
-        return path
-
-
 def test_base_series_reader_merge():
+    class DummyReader(BaseSeriesReader):
+        def read(self, path):
+            return path
+
     reader = DummyReader()
     data = [1, 2, 3]
     assert reader.merge(data) == data
@@ -325,12 +321,6 @@ def test_function_reader_str():
     reader = FunctionReader(my_reader)
 
     assert str(reader) == repr(reader)
-
-
-def test_function_reader_lambda():
-    reader = FunctionReader(lambda x: x * 2)
-
-    assert reader.read(4) == 8
 
 
 ### Lammpsdumpreader

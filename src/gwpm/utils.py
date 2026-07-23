@@ -409,7 +409,7 @@ def variable_to_string(
             return tmp
         else:
             # We have a matrix.
-            if mode == None or not mode.lower().__contains__("matrix_"):
+            if mode is None or not mode.lower().__contains__("matrix_"):
                 default_mode = True
                 line_sep = buffer_list_type
                 column_sep = "\n"

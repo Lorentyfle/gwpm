@@ -9,6 +9,7 @@ from gwpm.utils import (
 )
 from gwpm import check_folder, variable_to_string
 import numpy as np
+from ase.cell import Cell
 
 
 def test_require_ase(monkeypatch):
@@ -222,9 +223,6 @@ def test_variable_to_string_scientific_no_float_trail():
 
     assert isinstance(result, str)
     assert "e" not in result
-
-
-from ase.cell import Cell
 
 
 def test_variable_to_string_cell():

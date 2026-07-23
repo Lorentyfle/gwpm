@@ -37,12 +37,12 @@ from .utils import check_folder, variable_to_string
 
 from .exception import (
     GWPMError,
-    PathResolutionError,
-    ReferenceResolutionError,
-    ReplacerConfigurationError,
-    DependencyLoopError,
+    #    PathResolutionError,
+    #    ReferenceResolutionError,
+    #    ReplacerConfigurationError,
+    #    DependencyLoopError,
     SerializationError,
-    PlaceHolderSeriesError,
+    #    PlaceHolderSeriesError,
 )
 
 __all__ = [
@@ -56,6 +56,7 @@ __all__ = [
     "BaseSeriesReader",
     "CSVReader",
     "ASEReader",
+    "PymatgenReader",
     "LammpsDumpReader",
     "LammpsLogReader",
     "FunctionReader",
@@ -70,4 +71,7 @@ __all__ = [
     # Series exceptions
     "PlaceHolderSeriesError",
     "BaseSeriesReaderError",
+    ## Utils functions
+    "check_folder",
+    "variable_to_string",
 ]
