@@ -718,5 +718,3 @@ def test_pymatgen_reader_read_merged():
         "FILE_1",
         "FILE_2",
     ]
-
-
