@@ -6,7 +6,13 @@ from gwpm import (
     variable_to_string
 )
 import numpy as np
-
+import importlib
+import sys
+def test_require_ase(monkeypatch):
+    import gwpm.utils as utils
+    monkeypatch.setattr(utils, "Atoms", None)
+    with pytest.raises(ImportError):
+        utils._require_ase()
 #### parse_lammps_dump
 def test_parse_lammps_dump(tmp_path):
     dump = tmp_path / "dump.lammpstrj"

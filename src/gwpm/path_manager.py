@@ -497,7 +497,7 @@ class GeneralWorkPathManager():
                 return [index[name] for name in self.variable_names]
             raise PathResolutionError("Index key must match either all placeholderss or all variable names.")
         raise PathResolutionError("Index given in a non known data type.")
-    def _check_loop_placeholderss(self,variables:Optional[List[List[str]]]=None)->bool:
+    def _check_loop_placeholders(self,variables:Optional[List[List[str]]]=None)->bool:
         """
         Check whether the placeholders contains dependency loops.
 
@@ -604,7 +604,7 @@ class GeneralWorkPathManager():
         remains, allowing a variable's value to itself contain another
         placeholders token.
 
-        Assumes `_check_loop_placeholderss` has already been called by the
+        Assumes `_check_loop_placeholders` has already been called by the
         caller, so no dependency loop exists (otherwise this loops forever).
 
         Parameters
@@ -738,7 +738,7 @@ class GeneralWorkPathManager():
         path, path_file = self._build_path(starter=starter,is_out=is_out)
         variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
         if recursive:
-            self._check_loop_placeholderss()
+            self._check_loop_placeholders()
             path        =self._resolve_recursive(path, variables)
             path_file   = self._resolve_recursive(path_file, variables)
         else:
@@ -790,7 +790,7 @@ class GeneralWorkPathManager():
             )
         path, path_file = self._build_path(starter=starter,is_out=is_out,output_file=output_file)
         if recursive:
-            self._check_loop_placeholderss([[v] for v in list_of_var])
+            self._check_loop_placeholders([[v] for v in list_of_var])
             path        = self._resolve_recursive(path,list_of_var)
             path_file   = self._resolve_recursive(path_file, list_of_var)
         else:
@@ -846,13 +846,13 @@ class GeneralWorkPathManager():
         ------
         ValueError
             If the placeholders/variable configuration contains a dependency
-            loop (see `_check_loop_placeholderss`).
+            loop (see `_check_loop_placeholders`).
         Raises
         ------
         DependencyLoopError
         """
         index = self._normalize_index(index)
-        self._check_loop_placeholderss()
+        self._check_loop_placeholders()
         variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
         return self._resolve_recursive(g_path + g_file, variables)
     def parse(self,path:str)->Dict[str,str]:

@@ -1,4 +1,6 @@
-from typing import List, Union, Dict, Optional
+from __future__ import annotations
+
+from typing import List, Union, Dict, Optional, TYPE_CHECKING
 import os
 import re
 from pathlib import Path
@@ -6,8 +8,12 @@ from abc import ABC, abstractmethod
 from functools import cached_property
 import pandas as pd
 ## ASE
-from ase import Atoms
-from ase.io import read
+if TYPE_CHECKING:
+    from ase import Atoms
+try:
+    from ase.io import read
+except ImportError: # pragma: no cover
+    read = None
 
 ## Utils.
 from .utils import parse_lammps_dump
@@ -15,6 +21,12 @@ from .exception import (
     PlaceHolderSeriesError,
     BaseSeriesReaderError,
 )
+def _require_ase():
+    if read is None:
+        raise ImportError(
+            "ASE is required. "
+            "Install with pip install gwpm[structures]"
+        )
 
 class PlaceholderSeries:
     """
@@ -397,7 +409,7 @@ class ASEReader(BaseSeriesReader):
         return (f"ASEReader(index={self.index!r})")
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str):
+    def read(self, path:str) -> Union[Atoms, List[Atoms]]:
         """
         Read an ASE-supported file.
 
@@ -411,6 +423,7 @@ class ASEReader(BaseSeriesReader):
         Atoms or List[Atoms]
             Structure(s) returned by ASE.
         """
+        _require_ase()
         return read(path,self.index,)
     def merge(self, data)->List[Atoms]:
         """
@@ -474,6 +487,7 @@ class LammpsDumpReader(BaseSeriesReader):
         Atoms or List[Atoms]
             Parsed ASE structure(s).
         """
+        _require_ase()
         return parse_lammps_dump(
             path,
             self.Z_of_type,

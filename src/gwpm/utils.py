@@ -1,14 +1,23 @@
 from typing import List, Union, Any, Optional
 import warnings
 
-import os
 import numpy as np
 from numpy import ndarray
 from pathlib import Path
 # ASE.
-from ase import Atoms
-from ase.cell import Cell
-
+try:
+    from ase import Atoms
+    from ase.cell import Cell
+except ImportError: # pragma: no cover
+    Atoms = None
+    Cell = None
+def _require_ase():
+    if Atoms is None:
+        raise ImportError(
+            "ASE is required. "
+            "Install with pip install gwpm[structures]"
+            )
+###################
 def parse_index_option(index:int, timesteps:list)->list:
     """
     Convert an index specification into file offsets.
@@ -154,6 +163,7 @@ def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, 
     >>> len(atoms)
     10
     """
+    _require_ase()
     # Initialize variables
     positions = []
     symbols = []
@@ -470,8 +480,7 @@ def variable_to_string(
             lead_zero = "{:0>{}}".format(variable, leading_zero)
             trail_zero = "{:0<{}}".format(lead_zero, trailing_zero)
         return trail_zero
-    ## Add verification if Cell exist / is installed.
-    if isinstance(variable, Cell):
+    if Cell is not None and isinstance(variable, Cell):
         # Special conversion of the Cell class from ASE into a string.
         string_list = []
 

@@ -14,6 +14,12 @@ from gwpm import (
 from unittest.mock import patch
 from ase import Atoms
 from gwpm import ASEReader
+## Import tests.
+def test_require_ase(monkeypatch):
+    import gwpm.series_reader as sr
+    monkeypatch.setattr(sr, "read", None)
+    with pytest.raises(ImportError):
+        sr._require_ase()
 # ==========================================================
 # PlaceholderSeries
 # ==========================================================
