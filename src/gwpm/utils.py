@@ -171,7 +171,8 @@ def variable_to_string(
     trailing_zero: int = 0,
     leading_zero: int = 0,
     float_trail: bool = False,
-    litteral_string: bool = False) -> str:
+    litteral_string: bool = False,
+    force_float:bool = False,) -> str:
     """
     Convert a variable into a formatted string for clean output in text files.
 
@@ -198,6 +199,9 @@ def variable_to_string(
 
         litteral_string (bool, optional):
             If True, wraps string values in quotes (" or ') for literal representation.
+        
+        force_float (bool, optional):
+            If True, even if an exponent is seen, it will transform it into a float.
 
     Returns:
         str:
@@ -294,12 +298,13 @@ def variable_to_string(
         # Float with exponent
         if str(variable).__contains__("e"):
             _, exponent = str(variable).split("e")
-            if abs(int(exponent)) > 10:
+            str_var = format(variable, f".{abs(int(exponent))}f")
+            if force_float:
+                str_var = str_var.rstrip("0")
+                if str_var.endswith("."):
+                    str_var += "0"
+            elif abs(int(exponent)) > 10:
                 str_var = str(variable) # keep scientific notation (the exponent is too big).
-            elif int(exponent) < 0:
-                str_var = format(variable, f".{abs(int(exponent))}f")
-            else:
-                str_var = format(variable, ".1f")
             #
             if float_trail:
                 int_part, float_part = str_var.split(

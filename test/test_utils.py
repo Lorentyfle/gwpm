@@ -205,7 +205,12 @@ def test_variable_to_string_integer():
     """Covers non-float branche."""
     result = variable_to_string(1000)
     assert result == "1000"
-
+def test_variable_to_string_positive_exponent_branch_force_float():
+    result = variable_to_string(1e20,force_float=True)
+    assert result == "100000000000000000000.0"
+def test_variable_to_string_negative_exponent_branch_force_float():
+    result = variable_to_string(1e-20,force_float=True)
+    assert result == "0.00000000000000000001"
 #### litteral_string
 def test_litteral_str_already_quoted():
     assert litteral_str("'abc'") == "'abc'"
