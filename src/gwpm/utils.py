@@ -1,22 +1,82 @@
-from typing import List, Union, Dict, Optional
+from typing import List, Union, Any, Optional
 import warnings
 
 import os
 import numpy as np
 from numpy import ndarray
+from pathlib import Path
 # ASE.
 from ase import Atoms
 from ase.cell import Cell
 
-def parse_index_option(index:int, timesteps:list):
-    """Convert string index option into actual indices."""
+def parse_index_option(index:int, timesteps:list)->list:
+    """
+    Convert an index specification into file offsets.
+
+    This helper accepts either a single integer index or a Python-like
+    slice expression encoded as a string and returns the corresponding
+    entries from ``timesteps``.
+
+    Parameters
+    ----------
+    index : int or str
+        Selection specification.
+
+        - ``0`` returns the first timestep.
+        - ``-1`` returns the last timestep.
+        - ``":"`` returns all timesteps.
+        - ``"::2"`` returns every second timestep.
+        - ``"-10:"`` returns the last ten timesteps.
+
+    timesteps : list
+        List of file positions corresponding to timestep locations.
+
+    Returns
+    -------
+    list
+        Selected timestep offsets.
+
+    Examples
+    --------
+    >>> parse_index_option(0, [10, 20, 30])
+    [10]
+
+    >>> parse_index_option("1:", [10, 20, 30])
+    [20, 30]
+
+    >>> parse_index_option("::2", [10, 20, 30, 40])
+    [10, 30]
+    """
     if isinstance(index, int):  # Direct integer index
         return [timesteps[index]] if index < len(timesteps) else []
     elif isinstance(index, str):
         return timesteps[slice(*map(lambda x: int(x) if x else None, index.split(":")))]
     return []
-def detect_structure_size(file_path:str):
-    """Determines the number of lines per structure dynamically for each timestep."""
+def detect_structure_size(file_path:str)->List[int]:
+    """
+    Determine the number of lines associated with each structure
+    stored in a LAMMPS dump file.
+
+    The function scans the dump file and counts the number of lines
+    between successive ``ITEM: TIMESTEP`` markers. This allows the
+    parser to handle trajectories where the structure block size may
+    vary between timesteps.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the LAMMPS dump file.
+
+    Returns
+    -------
+    List[int]
+        Number of lines associated with each structure.
+
+    Examples
+    --------
+    >>> detect_structure_size("dump.lammpstrj")
+    [1253, 1253, 1253]
+    """
     structure_sizes = []
     with open(file_path, "r") as f:
         line_count = 0
@@ -36,23 +96,63 @@ def detect_structure_size(file_path:str):
     return structure_sizes  # Returns a list with sizes per structure
 def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, str] = ":" ):
     """
-    Parses a LAMMPS dump file and returns a list of ASE Atoms objects.
+    Read a LAMMPS dump trajectory and convert it into ASE structures.
 
-    Args:
-        file_path (str):
-            Path to the LAMMPS dump file.
-        element_mapping (dict):
-            Dictionary mapping atom types (int) to element symbols (str).
-        index (str): String for the reading of the file.
-                     * ``index=0``: first configuration
-                     * ``index=-2``: second to last
-                     * ``index=':'``: all
-                     * ``index='-3:'``: three last
-                     * ``index='::2'``: even
-                     * ``index='1::2'``: odd
-                     * ``index='::50'``: every 50 steps.
-    Returns:
-    - atom_array (list): List of ASE Atoms objects.
+    The function parses atomic coordinates, simulation cell dimensions,
+    and optionally atomic forces from a standard LAMMPS dump file. Each
+    selected timestep is returned as an ASE ``Atoms`` object.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the LAMMPS dump file.
+
+    element_mapping : Dict[int, str]
+        Mapping between LAMMPS atom types and chemical symbols.
+
+        Example::
+
+            {
+                1: "Li",
+                2: "O"
+            }
+
+    index : int or str, default=":"
+        Structure selection specification.
+
+        - ``0`` : first structure
+        - ``-1`` : last structure
+        - ``":"`` : all structures
+        - ``"-5:"`` : last five structures
+        - ``"::10"`` : every tenth structure
+        - ``"1::2"`` : every odd structure
+
+    Returns
+    -------
+    List[ase.Atoms]
+        List of ASE ``Atoms`` objects.
+
+    Raises
+    ------
+    ValueError
+        If an atom type appears that is not present in
+        ``element_mapping``.
+
+    Notes
+    -----
+    If force components (``fx``, ``fy``, ``fz``) are present in the
+    dump file they are detected during parsing, although they are not
+    currently attached to the returned ``Atoms`` objects.
+
+    Examples
+    --------
+    >>> atoms = parse_lammps_dump(
+    ...     "dump.lammpstrj",
+    ...     {1: "Li", 2: "O"},
+    ...     index="::100"
+    ... )
+    >>> len(atoms)
+    10
     """
     # Initialize variables
     positions = []
@@ -158,14 +258,34 @@ def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, 
             #
     return atom_array
 ########
-def check_folder(folder: str):
-    """Function that checks if the folder exist, if it doesn't create one."""
-    if not os.path.isdir(folder):
-        os.makedirs(folder)
-        print("Creating folder(s) following " + folder)
+def check_folder(folder: Union[str,Path])->None:
+    """
+    Ensure that a directory exists.
 
+    If the target directory does not already exist, it is created
+    along with any missing parent directories.
+
+    Parameters
+    ----------
+    folder : str or pathlib.Path
+        Directory path to verify.
+
+    Notes
+    -----
+    A message is printed when a new directory is created.
+
+    Examples
+    --------
+    >>> check_folder("./output")
+
+    >>> check_folder(Path("./output"))
+    """
+    folder = Path(folder)
+    if not folder.is_dir():
+        folder.mkdir(parents=True, exist_ok=True)
+        print(f"Creating folder(s) following {folder}")
 def variable_to_string(
-    variable,
+    variable:Any,
     mode: str = None,
     buffer_list_type: str = " ",
     trailing_zero: int = 0,
@@ -174,51 +294,76 @@ def variable_to_string(
     litteral_string: bool = False,
     force_float:bool = False,) -> str:
     """
-    Convert a variable into a formatted string for clean output in text files.
+    Convert a Python object into a formatted string representation.
 
-    Parameters:
-        variable (Any):
-            The input variable to convert (int, float, bool, str, list, matrix, etc.).
+    The function provides a consistent conversion layer for writing
+    values to text-based input files. It supports scalars, lists,
+    matrices, NumPy arrays, ASE ``Cell`` objects, and several
+    formatting conventions used by scientific software.
 
-        mode (str, optional):
-            Formatting mode:
-            - "F90": Converts booleans to Fortran-style (.TRUE. / .FALSE.).
-            - "matrix_2-0": Formats matrices with 2 spaces between rows and 0 between columns.
+    Parameters
+    ----------
+    variable : Any
+        Object to convert.
 
-        buffer_list_type (str, optional):
-            Separator used when formatting lists or matrices. Default is a single space.
+    mode : str, optional
+        Formatting mode.
 
-        trailing_zero (int, optional):
-            Number of trailing zeros to append to float values. Default is 0.
+        Supported values include:
 
-        leading_zero (int, optional):
-            Number of leading zeros to prepend to numeric values (excluding booleans). Default is 0.
+        ``"F90"``
+            Format boolean values as Fortran logicals.
 
-        float_trail (bool, optional):
-            If True, keeps trailing zeros in floats even if they are numerically integers.
+        ``"VASP"``
+            Format boolean values as VASP logicals.
 
-        litteral_string (bool, optional):
-            If True, wraps string values in quotes (" or ') for literal representation.
-        
-        force_float (bool, optional):
-            If True, even if an exponent is seen, it will transform it into a float.
+        ``"matrix_X-Y"``
+            Format matrices using X spaces between columns and Y spaces
+            before each new row.
 
-    Returns:
-        str:
-            A string representation of the input variable, formatted according to the specified options.
+    buffer_list_type : str, default=" "
+        Separator used when formatting one-dimensional lists.
 
-    Examples:
-        >>> variable_to_string(3.5, trailing_zero=2)
-        '3.50'
+    trailing_zero : int, default=0
+        Minimum number of trailing digits or characters.
 
-        >>> variable_to_string(True, mode="F90")
-        '.TRUE.'
+    leading_zero : int, default=0
+        Minimum width padded with leading zeros.
 
-        >>> variable_to_string("hello", litteral_string=True)
-        '"hello"'
+    float_trail : bool, default=False
+        Preserve trailing zeroes for floating-point numbers.
 
-        >>> variable_to_string([[1, 2], [3, 4]], mode="matrix_2-0")
-        1 2\n3 4
+    litteral_string : bool, default=False
+        Wrap string values in quotes.
+
+    force_float : bool, default=False
+        Force scientific notation values to be expanded as decimal
+        floating-point numbers whenever possible.
+
+    Returns
+    -------
+    str
+        Formatted string representation.
+
+    Warns
+    -----
+    SyntaxWarning
+        Issued when an unsupported object type is encountered and
+        fallback conversion via ``str()`` is used.
+
+    Examples
+    --------
+    >>> variable_to_string(3.5, trailing_zero=2)
+    '3.50'
+
+    >>> variable_to_string(True, mode="F90")
+    '.TRUE.'
+
+    >>> variable_to_string(
+    ...     [[1, 2], [3, 4]],
+    ...     mode="matrix_2-0"
+    ... )
+    '1  2\\n3  4'
     """
     # Function implementation goes here
     if isinstance(variable, (list, ndarray)):
@@ -346,8 +491,34 @@ def variable_to_string(
         SyntaxWarning,
     )
     return str(variable)
-def litteral_str(string: str, verbose: bool = False):
-    """Add \" or ' in between a string if necessary."""
+def litteral_str(string: str, verbose: bool = False)->str:
+    """
+    Return a quoted string literal.
+
+    If the supplied string is already enclosed in single or double
+    quotes it is returned unchanged. Otherwise single quotes are added.
+
+    Parameters
+    ----------
+    string : str
+        String to convert into a literal representation.
+
+    verbose : bool, default=False
+        Print diagnostic messages.
+
+    Returns
+    -------
+    str
+        Quoted string.
+
+    Examples
+    --------
+    >>> litteral_str("hello")
+    "'hello'"
+
+    >>> litteral_str("'hello'")
+    "'hello'"
+    """
     if (string.startswith("'") or string.startswith('"')) and (
         string.endswith("'") or string.endswith('"')
     ):
@@ -355,14 +526,62 @@ def litteral_str(string: str, verbose: bool = False):
             print("Nothing to do.")
         return string
     return "'" + string + "'"
-def getnonemptylist(str: str, splitSym):
-    """Function that will remove spaces and line jump from the read and split the lines in function of spaces.
+def getnonemptylist(str: str, splitSym:str)->List[str]:
+    """
+    Split a string and remove empty fields.
 
-    This function was done by Stephen Rauch on stackoverflow."""
+    Parameters
+    ----------
+    string : str
+        Input text.
+
+    splitSym : str
+        Delimiter used to split the text.
+
+    Returns
+    -------
+    List[str]
+        Non-empty tokens.
+
+    Notes
+    -----
+    Original implementation inspired by a Stack Overflow answer from
+    Stephen Rauch.
+
+    Examples
+    --------
+    >>> getnonemptylist("a  b   c", " ")
+    ['a', 'b', 'c']
+    """
     return [s for s in str.split(splitSym) if s.strip() != ""]
 def _numpy_to_list_recursive(obj):
     """
-    Recursively convert NumPy arrays inside nested structures into Python lists.
+    Recursively convert NumPy arrays into Python lists.
+
+    Nested containers such as lists and tuples are traversed and all
+    encountered NumPy arrays are replaced by their corresponding
+    ``tolist()`` representation.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to convert.
+
+    Returns
+    -------
+    Any
+        Converted object with all NumPy arrays replaced by native
+        Python lists.
+
+    Examples
+    --------
+    >>> _numpy_to_list_recursive(np.array([1, 2, 3]))
+    [1, 2, 3]
+
+    >>> _numpy_to_list_recursive(
+    ...     [np.array([1, 2]), np.array([3, 4])]
+    ... )
+    [[1, 2], [3, 4]]
     """
     if isinstance(obj, np.ndarray):
         return obj.tolist()
