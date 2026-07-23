@@ -11,10 +11,6 @@ from ._version import __version__
 from .path_manager import (
     GeneralWorkPathManager,
     ReferenceVariable,
-    ReferenceResolutionError,
-    ReplacerConfigurationError,
-    DependencyLoopError,
-    PathResolutionError,
 )
 
 # Series API
@@ -28,8 +24,6 @@ from .series_reader import (
     LammpsLogReader,
     FunctionReader,
     ThermoLogReader,
-    PlaceHolderSeriesError,
-    BaseSeriesReaderError,
 )
 
 from .utils import check_folder, variable_to_string
@@ -37,12 +31,12 @@ from .utils import check_folder, variable_to_string
 
 from .exception import (
     GWPMError,
-    #    PathResolutionError,
-    #    ReferenceResolutionError,
-    #    ReplacerConfigurationError,
-    #    DependencyLoopError,
+    PathResolutionError,
+    ReferenceResolutionError,
+    ReplacerConfigurationError,
+    DependencyLoopError,
     SerializationError,
-    #    PlaceHolderSeriesError,
+    PlaceHolderSeriesError,
 )
 
 __all__ = [

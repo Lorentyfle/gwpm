@@ -30,7 +30,7 @@ setup(
     extras_require={
         # Only needed if StructureIO or specific series_reader are used.
         "structures": ["ase", "pymatgen"],
-        "test": ["pytest","ase","pymatgen"],
+        "test": ["pytest", "ase", "pymatgen"],
         "dev": ["pytest", "black", "ruff", "ase", "pymatgen"],
     },
     zip_safe=False,
