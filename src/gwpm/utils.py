@@ -1,24 +1,26 @@
-from typing import List, Union, Any, Optional
+from typing import List, Union, Any
 import warnings
 
 import numpy as np
 from numpy import ndarray
 from pathlib import Path
+
 # ASE.
 try:
     from ase import Atoms
     from ase.cell import Cell
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     Atoms = None
     Cell = None
+
+
 def _require_ase():
     if Atoms is None:
-        raise ImportError(
-            "ASE is required. "
-            "Install with pip install gwpm[structures]"
-            )
+        raise ImportError("ASE is required. Install with pip install gwpm[structures]")
+
+
 ###################
-def parse_index_option(index:int, timesteps:list)->list:
+def parse_index_option(index: int, timesteps: list) -> list:
     """
     Convert an index specification into file offsets.
 
@@ -61,7 +63,9 @@ def parse_index_option(index:int, timesteps:list)->list:
     elif isinstance(index, str):
         return timesteps[slice(*map(lambda x: int(x) if x else None, index.split(":")))]
     return []
-def detect_structure_size(file_path:str)->List[int]:
+
+
+def detect_structure_size(file_path: str) -> List[int]:
     """
     Determine the number of lines associated with each structure
     stored in a LAMMPS dump file.
@@ -103,7 +107,11 @@ def detect_structure_size(file_path:str)->List[int]:
 
     structure_sizes.append(line_count)  # Store last structure size
     return structure_sizes  # Returns a list with sizes per structure
-def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, str] = ":" ):
+
+
+def parse_lammps_dump(
+    file_path: str, element_mapping: dict, index: Union[int, str] = ":"
+):
     """
     Read a LAMMPS dump trajectory and convert it into ASE structures.
 
@@ -267,8 +275,10 @@ def parse_lammps_dump( file_path: str, element_mapping: dict, index: Union[int, 
             symbols = []  # Reset for the next block
             #
     return atom_array
+
+
 ########
-def check_folder(folder: Union[str,Path])->None:
+def check_folder(folder: Union[str, Path]) -> None:
     """
     Ensure that a directory exists.
 
@@ -294,15 +304,18 @@ def check_folder(folder: Union[str,Path])->None:
     if not folder.is_dir():
         folder.mkdir(parents=True, exist_ok=True)
         print(f"Creating folder(s) following {folder}")
+
+
 def variable_to_string(
-    variable:Any,
+    variable: Any,
     mode: str = None,
     buffer_list_type: str = " ",
     trailing_zero: int = 0,
     leading_zero: int = 0,
     float_trail: bool = False,
     litteral_string: bool = False,
-    force_float:bool = False,) -> str:
+    force_float: bool = False,
+) -> str:
     """
     Convert a Python object into a formatted string representation.
 
@@ -459,7 +472,9 @@ def variable_to_string(
                 if str_var.endswith("."):
                     str_var += "0"
             elif abs(int(exponent)) > 10:
-                str_var = str(variable) # keep scientific notation (the exponent is too big).
+                str_var = str(
+                    variable
+                )  # keep scientific notation (the exponent is too big).
             #
             if float_trail:
                 int_part, float_part = str_var.split(
@@ -500,7 +515,9 @@ def variable_to_string(
         SyntaxWarning,
     )
     return str(variable)
-def litteral_str(string: str, verbose: bool = False)->str:
+
+
+def litteral_str(string: str, verbose: bool = False) -> str:
     """
     Return a quoted string literal.
 
@@ -535,7 +552,9 @@ def litteral_str(string: str, verbose: bool = False)->str:
             print("Nothing to do.")
         return string
     return "'" + string + "'"
-def getnonemptylist(str: str, splitSym:str)->List[str]:
+
+
+def getnonemptylist(str: str, splitSym: str) -> List[str]:
     """
     Split a string and remove empty fields.
 
@@ -563,6 +582,8 @@ def getnonemptylist(str: str, splitSym:str)->List[str]:
     ['a', 'b', 'c']
     """
     return [s for s in str.split(splitSym) if s.strip() != ""]
+
+
 def _numpy_to_list_recursive(obj):
     """
     Recursively convert NumPy arrays into Python lists.

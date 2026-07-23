@@ -1,6 +1,6 @@
 from gwpm import GeneralWorkPathManager
 
-struct      = ["Li2O", "Li2S"]
+struct = ["Li2O", "Li2S"]
 temperature = ["300", "600", "900"]
 gwpm = GeneralWorkPathManager(
     list_of_variables=[
@@ -19,4 +19,4 @@ print(
 )
 for i in range(len(struct)):
     for j in range(len(temperature)):
-        print(gwpm.resolve_path([i,j]))
+        print(gwpm.resolve_path([i, j]))

@@ -8,8 +8,8 @@ temperatures = ReferenceVariable(
         ["900", "950", "1000"],
         ["700", "750", "800"],
     ],
-    reference_position=0
-    )
+    reference_position=0,
+)
 
 gwpm = GeneralWorkPathManager(
     list_of_variables=[
@@ -24,8 +24,4 @@ gwpm = GeneralWorkPathManager(
     path="./?/!K/",
 )
 
-print(
-    gwpm.resolve_path(
-        {"structure": 1,"temperature": 0},
-        immutable=True)
-    )
+print(gwpm.resolve_path({"structure": 1, "temperature": 0}, immutable=True))

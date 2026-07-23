@@ -1,4 +1,5 @@
 from gwpm import GeneralWorkPathManager
+
 gwpm = GeneralWorkPathManager(
     list_of_variables=[
         ["Li2O"],

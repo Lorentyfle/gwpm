@@ -1,11 +1,14 @@
 """Test of the General Work Path Manager classes."""
+
 import pytest
 from pathlib import Path
+
 ## Classes tested.
 from gwpm import (
     GeneralWorkPathManager,
     ReferenceVariable,
 )
+
 ## Exceptions.
 from gwpm import (
     ReplacerConfigurationError,
@@ -14,6 +17,8 @@ from gwpm import (
     DependencyLoopError,
     PlaceHolderSeriesError,
 )
+
+
 # ==========================================================
 # ReferenceVariable
 # ==========================================================
@@ -25,6 +30,8 @@ def test_reference_variable_creation():
 
     assert rv.reference_position == 0
     assert rv.values == [["a", "b"], ["c", "d"]]
+
+
 def test_reference_variable_negative_reference():
     rv = ReferenceVariable(
         [["a"]],
@@ -35,6 +42,8 @@ def test_reference_variable_negative_reference():
         placeholders=["?", "!"],
     )
     assert rv.reference_position == 0
+
+
 def test_reference_variable_len():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -42,6 +51,8 @@ def test_reference_variable_len():
     )
 
     assert len(rv) == 2
+
+
 def test_reference_variable_iter():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -49,6 +60,8 @@ def test_reference_variable_iter():
     )
 
     assert list(rv) == [["a"], ["b"]]
+
+
 def test_reference_variable_getitem():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -56,6 +69,8 @@ def test_reference_variable_getitem():
     )
 
     assert rv[1] == ["b"]
+
+
 def test_reference_variable_contains():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -64,6 +79,8 @@ def test_reference_variable_contains():
 
     assert ["a"] in rv
     assert ["c"] not in rv
+
+
 def test_reference_variable_to_dict():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -75,6 +92,8 @@ def test_reference_variable_to_dict():
         "values": [["a"], ["b"]],
         "reference_position": 0,
     }
+
+
 def test_reference_variable_str():
     rv = ReferenceVariable(
         [["a"]],
@@ -83,6 +102,8 @@ def test_reference_variable_str():
     text = str(rv)
     assert "ReferenceVariable" in text
     assert "reference_position=0" in text
+
+
 # ==========================================================
 # Constructor checks
 # ==========================================================
@@ -92,12 +113,16 @@ def test_duplicate_placeholders():
             [["A"], ["B"]],
             placeholders=["?", "?"],
         )
+
+
 def test_invalid_placeholders_length():
     with pytest.raises(PathResolutionError):
         GeneralWorkPathManager(
             [["A"], ["B"]],
             placeholders=["?"],
         )
+
+
 def test_reference_variable_out_of_range():
     rv = ReferenceVariable(
         [["a"]],
@@ -109,6 +134,8 @@ def test_reference_variable_out_of_range():
             [["A"], rv],
             placeholders=["?", "!"],
         )
+
+
 def test_reference_variable_self_reference():
     rv = ReferenceVariable(
         [["a"]],
@@ -119,6 +146,8 @@ def test_reference_variable_self_reference():
             [["A"], rv],
             placeholders=["?", "!"],
         )
+
+
 def test_current_initially_none():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -127,12 +156,16 @@ def test_current_initially_none():
 
     assert gwpm.current_path is None
     assert gwpm.current_path_file is None
+
+
 def test_constructor_placeholders_none():
     with pytest.raises(ReplacerConfigurationError):
         GeneralWorkPathManager(
             [["A"]],
             placeholders=None,
         )
+
+
 def test_reference_variable_future_reference():
     rv = ReferenceVariable(
         [["a"]],
@@ -143,6 +176,8 @@ def test_reference_variable_future_reference():
             [rv, ["b"]],
             placeholders=["?", "!"],
         )
+
+
 # ==========================================================
 # Basic container behavior
 # ==========================================================
@@ -153,6 +188,8 @@ def test_len():
     )
 
     assert len(gwpm) == 2
+
+
 def test_contains():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -161,6 +198,8 @@ def test_contains():
 
     assert "?" in gwpm
     assert "!" not in gwpm
+
+
 def test_getitem_by_index():
     gwpm = GeneralWorkPathManager(
         [["A", "B"]],
@@ -168,6 +207,8 @@ def test_getitem_by_index():
     )
 
     assert gwpm[0] == ["A", "B"]
+
+
 def test_getitem_by_placeholders():
     gwpm = GeneralWorkPathManager(
         [["A", "B"]],
@@ -175,6 +216,8 @@ def test_getitem_by_placeholders():
     )
 
     assert gwpm["?"] == ["A", "B"]
+
+
 def test_getitem_unknown_placeholders():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -183,6 +226,8 @@ def test_getitem_unknown_placeholders():
 
     with pytest.raises(KeyError):
         gwpm["!"]
+
+
 def test_keys_values_items():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -195,6 +240,8 @@ def test_keys_values_items():
         ("?", ["A"]),
         ("!", ["B"]),
     ]
+
+
 def test_iter():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -205,6 +252,8 @@ def test_iter():
         ("?", ["A"]),
         ("!", ["B"]),
     ]
+
+
 def test_repr():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -218,6 +267,8 @@ def test_repr():
     assert "GeneralWorkPathManager" in text
     assert "n_variables=1" in text
     assert "n_variables=1" in repr(gwpm)
+
+
 def test_str():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -228,12 +279,16 @@ def test_str():
 
     assert "general_path" in text
     assert "output_folder" in text
+
+
 def test_eq_other_type():
     gwpm = GeneralWorkPathManager(
         [["A"]],
         placeholders=["?"],
     )
     assert gwpm != "hello"
+
+
 def test_reference_variable_to_dict_from_dict_roundtrip():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[
@@ -249,15 +304,15 @@ def test_reference_variable_to_dict_from_dict_roundtrip():
         placeholders=["!", "?"],
     )
 
-    restored = GeneralWorkPathManager.from_dict(
-        gwpm.to_dict()
-    )
+    restored = GeneralWorkPathManager.from_dict(gwpm.to_dict())
 
     assert restored == gwpm
     assert isinstance(
         restored.list_of_variables[1],
         ReferenceVariable,
     )
+
+
 # ==========================================================
 # Equality / serialization
 # ==========================================================
@@ -275,6 +330,8 @@ def test_equality():
     )
 
     assert gwpm1 == gwpm2
+
+
 def test_to_dict_from_dict():
     gwpm = GeneralWorkPathManager(
         [["Li", "Na"]],
@@ -283,19 +340,19 @@ def test_to_dict_from_dict():
         placeholders=["?"],
     )
 
-    reconstructed = GeneralWorkPathManager.from_dict(
-        gwpm.to_dict()
-    )
+    reconstructed = GeneralWorkPathManager.from_dict(gwpm.to_dict())
 
     assert reconstructed == gwpm
+
+
 def test_to_dict_reference_variable():
     with pytest.raises(ReplacerConfigurationError):
         gwpm = GeneralWorkPathManager(
-            [["300K",'500K'],
-                ReferenceVariable([["fcc"]],2),
-                ["O"]
-            ],placeholders=["?",'!','$']
-            )
+            [["300K", "500K"], ReferenceVariable([["fcc"]], 2), ["O"]],
+            placeholders=["?", "!", "$"],
+        )
+
+
 def test_getlarger_referenceplaceholders():
     gwpm = GeneralWorkPathManager(
         [
@@ -308,10 +365,9 @@ def test_getlarger_referenceplaceholders():
         placeholders=["?", "!"],
     )
     data = gwpm.to_dict()
-    assert (
-        data["list_of_variables"][1]["__type__"]
-        == "ReferenceVariable"
-    )
+    assert data["list_of_variables"][1]["__type__"] == "ReferenceVariable"
+
+
 # ==========================================================
 # Serialization
 # ==========================================================
@@ -326,6 +382,8 @@ def test_reference_variable_from_dict():
 
     assert rv.values == [["a"], ["b"]]
     assert rv.reference_position == 0
+
+
 def test_json_roundtrip(tmp_path):
     filename = tmp_path / "gwpm.json"
 
@@ -337,11 +395,11 @@ def test_json_roundtrip(tmp_path):
 
     gwpm.to_json(filename)
 
-    loaded = GeneralWorkPathManager.from_json(
-        filename
-    )
+    loaded = GeneralWorkPathManager.from_json(filename)
 
     assert loaded == gwpm
+
+
 def test_pickle_roundtrip(tmp_path):
     filename = tmp_path / "gwpm.pkl"
 
@@ -352,11 +410,11 @@ def test_pickle_roundtrip(tmp_path):
 
     gwpm.save(filename)
 
-    loaded = GeneralWorkPathManager.load(
-        filename
-    )
+    loaded = GeneralWorkPathManager.load(filename)
 
     assert loaded == gwpm
+
+
 # ==========================================================
 # Index normalization
 # ==========================================================
@@ -366,9 +424,9 @@ def test_normalize_index_placeholders_dict():
         placeholders=["?", "!"],
     )
 
-    assert gwpm._normalize_index(
-        {"?": 0, "!": 0}
-    ) == [0, 0]
+    assert gwpm._normalize_index({"?": 0, "!": 0}) == [0, 0]
+
+
 def test_normalize_index_variable_dict():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -376,9 +434,9 @@ def test_normalize_index_variable_dict():
         variable_names=["x", "y"],
     )
 
-    assert gwpm._normalize_index(
-        {"x": 0, "y": 0}
-    ) == [0, 0]
+    assert gwpm._normalize_index({"x": 0, "y": 0}) == [0, 0]
+
+
 def test_normalize_index_missing_key():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -387,12 +445,16 @@ def test_normalize_index_missing_key():
 
     with pytest.raises(PathResolutionError):
         gwpm._normalize_index({"?": 0})
+
+
 def test_normalize_index_list():
     gwpm = GeneralWorkPathManager(
         [["A"]],
         placeholders=["?"],
     )
     assert gwpm._normalize_index([0]) == [0]
+
+
 def test_normalize_index_wrong_keys():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -406,6 +468,8 @@ def test_normalize_index_wrong_keys():
                 "y": 0,
             }
         )
+
+
 def test_normalize_index_variable_names_none_uses_empty_set():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[["A"]],
@@ -416,6 +480,8 @@ def test_normalize_index_variable_names_none_uses_empty_set():
 
     with pytest.raises(PathResolutionError):
         gwpm._normalize_index({"some_name": 0})
+
+
 def test_normalize_index_missing_variable_name():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[
@@ -430,10 +496,14 @@ def test_normalize_index_missing_variable_name():
         PathResolutionError,
         match=r"Missing variable\(s\):",
     ):
-        gwpm._normalize_index({
-            "element": 0,
-            # "phase" missing
-        })
+        gwpm._normalize_index(
+            {
+                "element": 0,
+                # "phase" missing
+            }
+        )
+
+
 # ==========================================================
 # _resolve_variable
 # ==========================================================
@@ -451,6 +521,8 @@ def test_resolve_standard_variable():
         )
         == "B"
     )
+
+
 def test_resolve_reference_variable():
     rv = ReferenceVariable(
         [
@@ -475,6 +547,8 @@ def test_resolve_reference_variable():
     )
 
     assert resolved == "hcp"
+
+
 def test_resolve_reference_variable_invalid():
     rv = ReferenceVariable(
         [["a"]],
@@ -492,6 +566,8 @@ def test_resolve_reference_variable_invalid():
             5,
             [0, 5],
         )
+
+
 # ==========================================================
 # Path conversion
 # ==========================================================
@@ -508,6 +584,8 @@ def test_resolve_path_simple():
     result = gwpm.resolve_path([0, 1])
 
     assert result == Path("Li/600K")
+
+
 def test_resolve_path_with_file():
     gwpm = GeneralWorkPathManager(
         [
@@ -522,6 +600,8 @@ def test_resolve_path_with_file():
     result = gwpm.resolve_path([0, 0])
 
     assert result == Path("./Li/300K/data.xyz")
+
+
 def test_resolve_path_reference_variable():
     gwpm = GeneralWorkPathManager(
         [
@@ -539,6 +619,8 @@ def test_resolve_path_reference_variable():
     )
     result = gwpm.resolve_path([1, 0])
     assert result == Path("./600K/hcp/")
+
+
 def test_resolve_path_invalid_indices_length():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -547,6 +629,8 @@ def test_resolve_path_invalid_indices_length():
 
     with pytest.raises(PathResolutionError):
         gwpm.resolve_path([0])
+
+
 def test_immutable_does_not_update_current():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -561,6 +645,8 @@ def test_immutable_does_not_update_current():
 
     assert gwpm.current_path is None
     assert gwpm.current_path_file is None
+
+
 # ==========================================================
 # Internal path helpers
 # ==========================================================
@@ -571,12 +657,12 @@ def test_build_path_starter():
         path="./?/",
     )
 
-    path, path_file = gwpm._build_path(
-        starter="/tmp/"
-    )
+    path, path_file = gwpm._build_path(starter="/tmp/")
 
     assert path.startswith("/tmp/")
     assert path_file.startswith("/tmp/")
+
+
 def test_build_path_output_folder():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -589,6 +675,8 @@ def test_build_path_output_folder():
     )
 
     assert path.endswith("output/")
+
+
 # ==========================================================
 # Manual path conversion
 # ==========================================================
@@ -599,11 +687,11 @@ def test_resolve_values():
         placeholders=["?", "!"],
     )
 
-    result = gwpm.resolve_values(
-        ["hello", "world"]
-    )
+    result = gwpm.resolve_values(["hello", "world"])
 
     assert result == Path("./hello/world/")
+
+
 def test_resolve_values_output_file():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -615,6 +703,8 @@ def test_resolve_values_output_file():
         output_file="data.txt",
     )
     assert result == Path("./folder/data.txt")
+
+
 def test_resolve_values_wrong_number_of_variables():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -623,6 +713,8 @@ def test_resolve_values_wrong_number_of_variables():
 
     with pytest.raises(PathResolutionError):
         gwpm.resolve_values(["A"])
+
+
 def test_resolve_values_recursive_branch():
     gwpm = GeneralWorkPathManager(
         [["x"], ["y"]],
@@ -637,6 +729,8 @@ def test_resolve_values_recursive_branch():
     )
 
     assert gwpm.current_path_file == Path("A/AB")
+
+
 def test_resolve_values_immutable():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[["A"]],
@@ -653,6 +747,8 @@ def test_resolve_values_immutable():
     assert result == Path("./A/file.txt")
     assert gwpm.current_path is None
     assert gwpm.current_path_file is None
+
+
 # ==========================================================
 # Replacer detection
 # ==========================================================
@@ -662,11 +758,11 @@ def test_placeholders_used():
         placeholders=["?", "!"],
     )
 
-    used = gwpm.placeholders_used(
-        "./?/!/"
-    )
+    used = gwpm.placeholders_used("./?/!/")
 
     assert used == ["?", "!"]
+
+
 def test_contains_placeholders():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -675,6 +771,8 @@ def test_contains_placeholders():
 
     assert gwpm.contains_placeholders("./?/")
     assert not gwpm.contains_placeholders("./folder/")
+
+
 # ==========================================================
 # Replacement engine
 # ==========================================================
@@ -690,6 +788,8 @@ def test_apply_replacements():
     )
 
     assert result == "./hello/world/"
+
+
 def test_longest_token_first():
     gwpm = GeneralWorkPathManager(
         [["A"], ["B"]],
@@ -702,6 +802,8 @@ def test_longest_token_first():
     )
 
     assert result == "B and A"
+
+
 # ==========================================================
 # Recursive replacement
 # ==========================================================
@@ -721,6 +823,8 @@ def test_recursive_replacement():
     )
 
     assert result == Path("./Hello World/")
+
+
 def test_non_recursive_replacement():
     gwpm = GeneralWorkPathManager(
         [
@@ -737,6 +841,8 @@ def test_non_recursive_replacement():
     )
 
     assert result == Path("./? World/")
+
+
 def test_resolve_recursive_stalled():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -748,6 +854,8 @@ def test_resolve_recursive_stalled():
             "?",
             ["?"],
         )
+
+
 def test_resolve_recursive_max_depth():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -760,6 +868,8 @@ def test_resolve_recursive_max_depth():
             ["??"],
             maximum_loop=5,
         )
+
+
 # ==========================================================
 # Loop detection
 # ==========================================================
@@ -773,6 +883,8 @@ def test_valid_dependency_graph():
     )
 
     assert gwpm._check_loop_placeholders()
+
+
 def test_invalid_dependency_graph():
     gwpm = GeneralWorkPathManager(
         [
@@ -784,6 +896,8 @@ def test_invalid_dependency_graph():
 
     with pytest.raises(DependencyLoopError):
         gwpm._check_loop_placeholders()
+
+
 def test_check_loop_placeholderss_length_mismatch():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -791,9 +905,9 @@ def test_check_loop_placeholderss_length_mismatch():
     )
 
     with pytest.raises(DependencyLoopError):
-        gwpm._check_loop_placeholders(
-            [["A"], ["B"]]
-        )
+        gwpm._check_loop_placeholders([["A"], ["B"]])
+
+
 def test_check_loop_placeholderss_nested_list_values():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[
@@ -806,6 +920,8 @@ def test_check_loop_placeholderss_nested_list_values():
         placeholders=["!", "?"],
     )
     assert gwpm._check_loop_placeholders() is True
+
+
 # ==========================================================
 # Current property
 # ==========================================================
@@ -823,6 +939,8 @@ def test_current_property():
 
     assert current["path"] == Path("./Li/")
     assert current["path_file"] == Path("./Li/file.xyz")
+
+
 def test_current_property_empty():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -833,6 +951,8 @@ def test_current_property_empty():
         "path": None,
         "path_file": None,
     }
+
+
 # ==========================================================
 # General Path conversion
 # ==========================================================
@@ -851,6 +971,8 @@ def test_path_general_conversion():
     assert result["path"] == "./Li/"
     assert "Li" in result["path_file"]
     assert result["var_used"] == ["?"]
+
+
 def test_path_recursive_general_conversion():
     gwpm = GeneralWorkPathManager(
         [
@@ -860,16 +982,15 @@ def test_path_recursive_general_conversion():
         placeholders=["?", "!"],
     )
 
-    result = (
-        gwpm
-        .path_recursive_general_conversion(
-            "./",
-            "!",
-            [0, 0],
-        )
+    result = gwpm.path_recursive_general_conversion(
+        "./",
+        "!",
+        [0, 0],
     )
 
     assert result == "./Hello World"
+
+
 def test_path_general_conversion_wrong_number_of_indices():
     gwpm = GeneralWorkPathManager(
         list_of_variables=[
@@ -888,6 +1009,8 @@ def test_path_general_conversion_wrong_number_of_indices():
             g_file="file.txt",
             index=[0],
         )
+
+
 # ==========================================================
 # Resolve
 # ==========================================================
@@ -909,6 +1032,8 @@ def test_resolve():
     )
 
     assert result == Path("./Li/600K/data.xyz")
+
+
 def test_resolve_missing_variable():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -918,6 +1043,8 @@ def test_resolve_missing_variable():
 
     with pytest.raises(KeyError):
         gwpm.resolve()
+
+
 def test_resolve_invalid_value():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -926,9 +1053,9 @@ def test_resolve_invalid_value():
     )
 
     with pytest.raises(PathResolutionError):
-        gwpm.resolve(
-            element="Fe"
-        )
+        gwpm.resolve(element="Fe")
+
+
 def test_resolve_from_indices():
     gwpm = GeneralWorkPathManager(
         [["Li", "Na"]],
@@ -942,6 +1069,8 @@ def test_resolve_from_indices():
     )
 
     assert result == Path("Na")
+
+
 def test_resolve_reference_variable_as_value():
     gwpm = GeneralWorkPathManager(
         [
@@ -966,6 +1095,8 @@ def test_resolve_reference_variable_as_value():
             temperature="300K",
             structure="fcc",
         )
+
+
 # ==========================================================
 # Parsing
 # ==========================================================
@@ -983,23 +1114,21 @@ def test_parse():
         path="./?/!/",
     )
 
-    result = gwpm.parse(
-        "./Li/300K/"
-    )
+    result = gwpm.parse("./Li/300K/")
 
     assert result == {
         "element": "Li",
         "temperature": "300K",
     }
 
-    result = gwpm.parse(
-        "./Na/500K/"
-    )
+    result = gwpm.parse("./Na/500K/")
 
     assert result == {
         "element": "Na",
         "temperature": "500K",
     }
+
+
 def test_parse_invalid():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1008,6 +1137,8 @@ def test_parse_invalid():
     )
     with pytest.raises(PathResolutionError):
         gwpm.parse("completely_invalid")
+
+
 # ==========================================================
 # Iteration
 # ==========================================================
@@ -1024,6 +1155,8 @@ def test_iter_paths():
     data = list(gwpm.iter_paths())
 
     assert len(data) == 2
+
+
 def test_all_paths():
     gwpm = GeneralWorkPathManager(
         [
@@ -1035,6 +1168,8 @@ def test_all_paths():
     )
     paths = gwpm.all_paths()
     assert len(paths) == 2
+
+
 # ==========================================================
 # pd.DataFrame
 # ==========================================================
@@ -1046,12 +1181,11 @@ def test_dataframe_roundtrip():
 
     df = gwpm.to_dataframe()
 
-    reconstructed = (
-        GeneralWorkPathManager
-        .from_dataframe(df)
-    )
+    reconstructed = GeneralWorkPathManager.from_dataframe(df)
 
     assert reconstructed == gwpm
+
+
 # ==========================================================
 # PlaceholderSeries
 # ==========================================================
@@ -1061,17 +1195,18 @@ class DummyReader:
 
     def read_all(self, series):
         return "all"
+
+
 def test_placeholder_series_from_current():
     placeholder = "<P>"
     gwpm = GeneralWorkPathManager(
-        [["Li"]],
-        placeholders=["?"],
-        path="./?/",
-        file=placeholder+'.xyz'
+        [["Li"]], placeholders=["?"], path="./?/", file=placeholder + ".xyz"
     )
     gwpm.resolve_path([0])
     series = gwpm.get_placeholder_series(placeholder=placeholder)
     assert series is not None
+
+
 def test_placeholder_series_without_placeholder():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1081,6 +1216,8 @@ def test_placeholder_series_without_placeholder():
     gwpm.resolve_path([0])
     with pytest.raises(PlaceHolderSeriesError):
         gwpm.get_placeholder_series()
+
+
 def test_placeholder_series_template():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1088,11 +1225,11 @@ def test_placeholder_series_template():
         path="./?/[.xyz",
     )
 
-    series = gwpm.get_placeholder_series(
-        use_current=False
-    )
+    series = gwpm.get_placeholder_series(use_current=False)
 
     assert series is not None
+
+
 def test_placeholder_series_no_current_path():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1101,6 +1238,8 @@ def test_placeholder_series_no_current_path():
 
     with pytest.raises(PathResolutionError):
         gwpm.get_placeholder_series()
+
+
 def test_read_placeholder_series_merged():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1118,6 +1257,8 @@ def test_read_placeholder_series_merged():
     )
 
     assert result == "merged"
+
+
 def test_read_placeholder_series_all():
     gwpm = GeneralWorkPathManager(
         [["Li"]],
@@ -1135,6 +1276,8 @@ def test_read_placeholder_series_all():
     )
 
     assert result == "all"
+
+
 # ==========================================================
 # Edge cases (possible break points)
 # ==========================================================
@@ -1152,6 +1295,8 @@ def test_recursive_replacement_stall():
             [0],
             recursive=True,
         )
+
+
 def test_deep_dependency_loop():
     gwpm = GeneralWorkPathManager(
         [
@@ -1164,6 +1309,8 @@ def test_deep_dependency_loop():
 
     with pytest.raises(DependencyLoopError):
         gwpm._check_loop_placeholders()
+
+
 def test_recursive_replacement_max_depth():
     gwpm = GeneralWorkPathManager(
         [
@@ -1178,23 +1325,20 @@ def test_recursive_replacement_max_depth():
             [0],
             recursive=True,
         )
+
+
 def test_reference_variable_roundtrip():
     rv = ReferenceVariable(
         [["a"], ["b"]],
         0,
     )
 
-    reconstructed = (
-        ReferenceVariable.from_dict(
-            rv.to_dict()
-        )
-    )
+    reconstructed = ReferenceVariable.from_dict(rv.to_dict())
 
     assert reconstructed.values == rv.values
-    assert (
-        reconstructed.reference_position
-        == rv.reference_position
-    )
+    assert reconstructed.reference_position == rv.reference_position
+
+
 # ==========================================================
 # Basic tests for gwpm properties.
 # ==========================================================
@@ -1206,6 +1350,8 @@ def test_getitem_invalid_type():
 
     with pytest.raises(TypeError):
         gwpm[1.5]
+
+
 def test_normalize_index_invalid_type():
     gwpm = GeneralWorkPathManager(
         [["A"]],
@@ -1214,6 +1360,8 @@ def test_normalize_index_invalid_type():
 
     with pytest.raises(PathResolutionError):
         gwpm._normalize_index("A")
+
+
 def test_inequality():
     gwpm1 = GeneralWorkPathManager(
         [["A"]],
@@ -1224,6 +1372,8 @@ def test_inequality():
         placeholders=["?"],
     )
     assert gwpm1 != gwpm2
+
+
 def test_reference_variable_not_contains():
     rv = ReferenceVariable(
         [["a"], ["b"]],
@@ -1231,6 +1381,8 @@ def test_reference_variable_not_contains():
     )
 
     assert ["z"] not in rv
+
+
 def test_iter_paths_content():
     gwpm = GeneralWorkPathManager(
         [
@@ -1249,6 +1401,8 @@ def test_iter_paths_content():
 
     assert data[0]["element"] == "Li"
     assert data[1]["element"] == "Na"
+
+
 @pytest.mark.parametrize("value", ["None", "NONE", "none"])
 def test_init_file_none_case_insensitive(value):
     gwpm = GeneralWorkPathManager(
@@ -1258,6 +1412,8 @@ def test_init_file_none_case_insensitive(value):
     )
 
     assert gwpm.file == ""
+
+
 def test_init_verbose_prints_message(capsys):
     GeneralWorkPathManager(
         list_of_variables=[["A"]],
@@ -1268,6 +1424,8 @@ def test_init_verbose_prints_message(capsys):
     captured = capsys.readouterr()
 
     assert captured.out == "GeneralWorkPathManager initialized.\n"
+
+
 # ==========================================================
 # GWPM with ReferenceVariable.
 # ==========================================================
@@ -1297,4 +1455,3 @@ def test_resolve_reference_variable_indices():
     )
 
     assert result == Path("./600K/hcp/")
-

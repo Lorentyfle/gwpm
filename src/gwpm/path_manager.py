@@ -1,4 +1,4 @@
-from typing import Union, Optional, Any, List, Tuple,  Dict
+from typing import Union, Optional, Any, List, Tuple, Dict
 from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
@@ -9,7 +9,7 @@ import pickle
 
 
 from .utils import variable_to_string
-from .series_reader import PlaceholderSeries,BaseSeriesReader
+from .series_reader import PlaceholderSeries, BaseSeriesReader
 from .exception import (
     ReplacerConfigurationError,
     ReferenceResolutionError,
@@ -17,8 +17,9 @@ from .exception import (
     DependencyLoopError,
 )
 
+
 @dataclass
-class ReferenceVariable():
+class ReferenceVariable:
     """
     Variable whose first index depends on the selection made for
     another variable.
@@ -52,42 +53,43 @@ class ReferenceVariable():
     If temperature index 1 is selected, ``structures`` will resolve
     values from ``["hcp", "liq"]``.
     """
-    values:List[List[Any]]
-    reference_position : int
+
+    values: List[List[Any]]
+    reference_position: int
 
     def __str__(self) -> str:
         return (
-            f"{self.__class__.__name__}("
-            f"reference_position={self.reference_position})"
+            f"{self.__class__.__name__}(reference_position={self.reference_position})"
         )
+
     def __len__(self):
         return len(self.values)
+
     def __iter__(self):
         return iter(self.values)
+
     def __getitem__(self, item):
         return self.values[item]
+
     def __contains__(self, item) -> bool:
         return item in self.values
+
     def to_dict(self) -> dict:
         """
         Export the object as a dictionary.
         """
         return {
-            "__type__" : self.__class__.__name__,
+            "__type__": self.__class__.__name__,
             "values": self.values,
             "reference_position": self.reference_position,
         }
+
     @classmethod
     def from_dict(cls, data):
-        return cls(
-            values=data["values"],
-            reference_position=data[
-                "reference_position"
-            ]
-        )
+        return cls(values=data["values"], reference_position=data["reference_position"])
 
 
-class GeneralWorkPathManager():
+class GeneralWorkPathManager:
     """
     Manage collections of related file paths that differ only by a set of
     placeholder variables.
@@ -112,17 +114,19 @@ class GeneralWorkPathManager():
     >>> gwpm.resolve_path([0, 1])
     './Li/600K/'
     """
-    __version__ : str = "1.4.0"
+
+    __version__: str = "1.4.0"
+
     def __init__(
         self,
-        list_of_variables: List[Union[List[Any],ReferenceVariable]],
+        list_of_variables: List[Union[List[Any], ReferenceVariable]],
         placeholders: List[str],
         path: str = "./",
         file: str = "",
-        variable_names: Optional[List[str]]=None,
+        variable_names: Optional[List[str]] = None,
         output_folder: str = "./output/",
         verbose: bool = False,
-        )->None:
+    ) -> None:
         if placeholders is None:
             raise ReplacerConfigurationError("Replacer must be given.")
         if len(set(placeholders)) != len(placeholders):
@@ -130,39 +134,45 @@ class GeneralWorkPathManager():
         if len(list_of_variables) == 1:
             placeholders = [placeholders[0]]
         if len(list_of_variables) != len(placeholders):
-            raise PathResolutionError("The list of variables in the folder tree must be the same as the one of the placeholders.")
+            raise PathResolutionError(
+                "The list of variables in the folder tree must be the same as the one of the placeholders."
+            )
         for i, variable in enumerate(list_of_variables):
-            if isinstance(variable,ReferenceVariable):
+            if isinstance(variable, ReferenceVariable):
                 ref = variable.reference_position
                 if ref < 0:
                     ref = i + ref
                 if ref < 0 or ref >= len(list_of_variables):
-                    raise ReplacerConfigurationError("ReferenceVariable cannot reference itself.")
+                    raise ReplacerConfigurationError(
+                        "ReferenceVariable cannot reference itself."
+                    )
                 if ref == i:
-                    raise ReplacerConfigurationError("ReferenceVariable cannot reference itself.")
+                    raise ReplacerConfigurationError(
+                        "ReferenceVariable cannot reference itself."
+                    )
                 if ref > i:
                     raise ReplacerConfigurationError(
                         "ReferenceVariable must reference a previous variable."
                     )
                 variable.reference_position = ref
         if variable_names is None:
-            variable_names = [
-                f"var_{i}"
-                for i in range(len(list_of_variables))
-            ]
-        self.list_of_variables : List[Union[List[Any],ReferenceVariable]] = list_of_variables
-        self.placeholders          : List[str]      = placeholders
-        self.variable_names    : List[str]      = variable_names
-        self.general_path      : str            = path
-        self.current_path      : Optional[Path] = None
-        self.current_path_file : Optional[Path] = None
-        self.file              : str            = file
-        self.output_folder     : str            = output_folder
-        self.verbose           : bool           = verbose
+            variable_names = [f"var_{i}" for i in range(len(list_of_variables))]
+        self.list_of_variables: List[Union[List[Any], ReferenceVariable]] = (
+            list_of_variables
+        )
+        self.placeholders: List[str] = placeholders
+        self.variable_names: List[str] = variable_names
+        self.general_path: str = path
+        self.current_path: Optional[Path] = None
+        self.current_path_file: Optional[Path] = None
+        self.file: str = file
+        self.output_folder: str = output_folder
+        self.verbose: bool = verbose
         if self.file.lower() == "none":
             self.file = ""
         if verbose:
             print("GeneralWorkPathManager initialized.")
+
     ##################################
     #### Getting back important data and information of the class.
     def __repr__(self) -> str:
@@ -170,7 +180,9 @@ class GeneralWorkPathManager():
             f"{self.__class__.__name__}("
             f"n_variables={len(self.list_of_variables)}, "
             f"path='{self.general_path}', "
-            f"file='{self.file}')")
+            f"file='{self.file}')"
+        )
+
     def __str__(self):
         return (
             f"{self.__class__.__name__}\n"
@@ -182,10 +194,13 @@ class GeneralWorkPathManager():
             f"├── placeholderss          : {self.placeholders}\n"
             f"└── n_variables        : {len(self.list_of_variables)}"
         )
+
     def __len__(self) -> int:
         return len(self.list_of_variables)
+
     def __iter__(self):
-        return iter(zip(self.placeholders,self.list_of_variables))
+        return iter(zip(self.placeholders, self.list_of_variables))
+
     def __getitem__(self, item):
         if isinstance(item, int):
             return self.list_of_variables[item]
@@ -196,10 +211,12 @@ class GeneralWorkPathManager():
                 raise KeyError(f"Unknown placeholders '{item}'.")
             return self.list_of_variables[idx]
         raise TypeError("Item must be an integer or a placeholders string.")
+
     def __contains__(self, item) -> bool:
         return item in self.placeholders
+
     def __eq__(self, other) -> bool:
-        if not isinstance(other,GeneralWorkPathManager):
+        if not isinstance(other, GeneralWorkPathManager):
             return False
         return (
             self.list_of_variables == other.list_of_variables
@@ -207,24 +224,28 @@ class GeneralWorkPathManager():
             and self.general_path == other.general_path
             and self.file == other.file
             and self.output_folder == other.output_folder
-            )
+        )
+
     def keys(self):
         """
         Return all placeholderss.
         """
         return self.placeholders
+
     def values(self):
         """
         Return all variables.
         """
         return self.list_of_variables
+
     def items(self):
         """
         Return (placeholders, variable) pairs.
         """
-        return list(zip(self.placeholders,self.list_of_variables))
+        return list(zip(self.placeholders, self.list_of_variables))
+
     @property
-    def current(self)->Dict[str,Optional[Path]]:
+    def current(self) -> Dict[str, Optional[Path]]:
         """
         Return the most recently resolved path information.
 
@@ -243,7 +264,8 @@ class GeneralWorkPathManager():
             "path": self.current_path,
             "path_file": self.current_path_file,
         }
-    def placeholders_used(self,text_to_test:str)->List[str]: 
+
+    def placeholders_used(self, text_to_test: str) -> List[str]:
         """
         Return the placeholders tokens present in a string.
 
@@ -263,7 +285,8 @@ class GeneralWorkPathManager():
             if text_to_test.__contains__(r):
                 rep_used.append(r)
         return rep_used
-    def contains_placeholders(self,text_to_test:str)->bool:
+
+    def contains_placeholders(self, text_to_test: str) -> bool:
         """
         Check whether a string contains any placeholders token.
 
@@ -281,16 +304,17 @@ class GeneralWorkPathManager():
             if text_to_test.__contains__(r):
                 return True
         return False
+
     def iter_paths(self):
         """
         Iterate over all possible path combinations.
-        
+
         Yields
         -------
         tuple
             (indices, resolved_path)
         """
-        ranges = [ range(len(v)) for v in self.list_of_variables ]
+        ranges = [range(len(v)) for v in self.list_of_variables]
         for index in product(*ranges):
             data = {
                 name: self._resolve_variable(
@@ -302,14 +326,16 @@ class GeneralWorkPathManager():
                     zip(self.variable_names, self.list_of_variables)
                 )
             }
-            data["index"]   = list(index)
-            data["path"]    = self.resolve_path(list(index),immutable=True)
+            data["index"] = list(index)
+            data["path"] = self.resolve_path(list(index), immutable=True)
             yield data
+
     ###################################################
     ### Save, load and return data.
     def all_paths(self):
         """Return all generated paths as a list."""
         return [item["path"] for item in self.iter_paths()]
+
     def to_dict(self) -> dict:
         """
         Export the manager configuration.
@@ -322,21 +348,15 @@ class GeneralWorkPathManager():
                 serialized_variables.append(var)
 
         return {
-            "list_of_variables":
-                serialized_variables,
-            "placeholders":
-                self.placeholders,
-            "variable_names":
-                self.variable_names,
-            "path":
-                self.general_path,
-            "file":
-                self.file,
-            "output_folder":
-                self.output_folder,
-            "verbose":
-                self.verbose,
+            "list_of_variables": serialized_variables,
+            "placeholders": self.placeholders,
+            "variable_names": self.variable_names,
+            "path": self.general_path,
+            "file": self.file,
+            "output_folder": self.output_folder,
+            "verbose": self.verbose,
         }
+
     def to_dataframe(self) -> pd.DataFrame:
         """
         Export the manager configuration as a pandas DataFrame.
@@ -344,11 +364,13 @@ class GeneralWorkPathManager():
         df = pd.DataFrame(self.iter_paths())
         df.attrs["gwpm_config"] = self.to_dict()
         return df
-    def to_json(self,filename:str)->None:
-        with open(filename,"w") as f:
+
+    def to_json(self, filename: str) -> None:
+        with open(filename, "w") as f:
             json.dump(self.to_dict(), f, indent=4)
         return
-    def save(self,filename:str):
+
+    def save(self, filename: str):
         """
         Serialize the manager to a pickle file.
 
@@ -361,8 +383,9 @@ class GeneralWorkPathManager():
         -----
         The object is stored using the standard ``pickle`` module.
         """
-        with open(filename,"wb") as f:
-            pickle.dump(self,f)
+        with open(filename, "wb") as f:
+            pickle.dump(self, f)
+
     @classmethod
     def from_dict(cls, data: dict):
         """
@@ -371,7 +394,7 @@ class GeneralWorkPathManager():
         """
         variables = []
         for var in data["list_of_variables"]:
-            if ( isinstance(var, dict) and var.get("__type__") == "ReferenceVariable"):
+            if isinstance(var, dict) and var.get("__type__") == "ReferenceVariable":
                 variables.append(ReferenceVariable.from_dict(var))
             else:
                 variables.append(var)
@@ -382,22 +405,28 @@ class GeneralWorkPathManager():
             output_folder=data["output_folder"],
             placeholders=data["placeholders"],
             variable_names=data.get("variable_names"),
-            verbose=data.get("verbose",False,)
-            )
+            verbose=data.get(
+                "verbose",
+                False,
+            ),
+        )
+
     @classmethod
-    def from_dataframe(cls, data:pd.DataFrame):
+    def from_dataframe(cls, data: pd.DataFrame):
         """
         Reconstruct a manager from a
         dictionary produced by ``to_dataframe``.
         """
         return cls.from_dict(data.attrs["gwpm_config"])
+
     @classmethod
-    def from_json(cls, filename:str):
+    def from_json(cls, filename: str):
         with open(filename) as f:
             data = json.load(f)
         return cls.from_dict(data)
+
     @classmethod
-    def load(cls,filename:str):
+    def load(cls, filename: str):
         """
         Load a previously pickled manager.
 
@@ -411,8 +440,9 @@ class GeneralWorkPathManager():
         GeneralWorkPathManager
             Restored manager instance.
         """
-        with open(filename,'rb') as f:
+        with open(filename, "rb") as f:
             return pickle.load(f)
+
     ###################################################
     ## Internal functions.
     ### Normalize multiple index types to a index kind.
@@ -449,7 +479,8 @@ class GeneralWorkPathManager():
             path += self.output_folder
         file = self.file if output_file is None else output_file
         return path, path + file
-    def _normalize_index(self,index:Union[List[int],Dict[str,int]]) -> List[int]:
+
+    def _normalize_index(self, index: Union[List[int], Dict[str, int]]) -> List[int]:
         """
         Convert supported index representations to a list of indices.
 
@@ -476,9 +507,9 @@ class GeneralWorkPathManager():
             match the manager configuration.
         """
         ## If a list is given this is fine.
-        if isinstance(index,list):
+        if isinstance(index, list):
             return index
-        if isinstance(index,dict):
+        if isinstance(index, dict):
             keys = set(index)
             placeholders_key = set(self.placeholders)
             if self.variable_names is not None:
@@ -488,16 +519,21 @@ class GeneralWorkPathManager():
             if keys <= placeholders_key:
                 missing = placeholders_key - keys
                 if missing:
-                    raise PathResolutionError(f'Missing placeholders(s): {missing}.')
+                    raise PathResolutionError(f"Missing placeholders(s): {missing}.")
                 return [index[r] for r in self.placeholders]
             if keys <= variable_keys:
                 missing = variable_keys - keys
                 if missing:
-                    raise PathResolutionError(f'Missing variable(s): {missing}.')
+                    raise PathResolutionError(f"Missing variable(s): {missing}.")
                 return [index[name] for name in self.variable_names]
-            raise PathResolutionError("Index key must match either all placeholderss or all variable names.")
+            raise PathResolutionError(
+                "Index key must match either all placeholderss or all variable names."
+            )
         raise PathResolutionError("Index given in a non known data type.")
-    def _check_loop_placeholders(self,variables:Optional[List[List[str]]]=None)->bool:
+
+    def _check_loop_placeholders(
+        self, variables: Optional[List[List[str]]] = None
+    ) -> bool:
         """
         Check whether the placeholders contains dependency loops.
 
@@ -538,24 +574,22 @@ class GeneralWorkPathManager():
             )
         # Build the dependency graph.
         graph = {placeholders: set() for placeholders in self.placeholders}
-        for placeholders, possible_values in zip(
-            self.placeholders,
-            list_of_variables
-            ):
+        for placeholders, possible_values in zip(self.placeholders, list_of_variables):
             for value in possible_values:
-                if isinstance(value,list):
-                    values_to_test   = value
+                if isinstance(value, list):
+                    values_to_test = value
                 else:
-                    values_to_test  = [value]
+                    values_to_test = [value]
                 for subvalue in values_to_test:
                     for other_placeholders in self.placeholders:
                         if other_placeholders in str(subvalue):
                             graph[placeholders].add(other_placeholders)
-        visited         = set()
+        visited = set()
         recursion_stack = set()
+
         def dfs(node: str) -> bool:
             """
-                Returns True if a cycle is found.
+            Returns True if a cycle is found.
             """
             if node in recursion_stack:
                 return True
@@ -568,13 +602,15 @@ class GeneralWorkPathManager():
                     return True
             recursion_stack.remove(node)
             return False
+
         for placeholders in self.placeholders:
             if dfs(placeholders):
                 raise DependencyLoopError(
                     f"Loop detected in placeholders dependencies involving '{placeholders}'."
                 )
         return True
-    def _apply_replacements(self,text: str, values:List[str]) -> str:
+
+    def _apply_replacements(self, text: str, values: List[str]) -> str:
         """
         Replace every placeholders token in `text` with its corresponding
         value from `values`, longest placeholders token first (to avoid
@@ -598,7 +634,10 @@ class GeneralWorkPathManager():
         ):
             text = text.replace(placeholders, variable_to_string(value))
         return text
-    def _resolve_recursive(self,text: str, values:List[str],maximum_loop:int=1000) -> str:
+
+    def _resolve_recursive(
+        self, text: str, values: List[str], maximum_loop: int = 1000
+    ) -> str:
         """
         Repeatedly apply `_apply_replacements` until no placeholders token
         remains, allowing a variable's value to itself contain another
@@ -624,18 +663,21 @@ class GeneralWorkPathManager():
         for _ in range(maximum_loop):
             if not self.contains_placeholders(text):
                 break
-            new_text = self._apply_replacements(text,values)
+            new_text = self._apply_replacements(text, values)
             if new_text == text:
                 raise PathResolutionError("Replacement process stalled.")
             text = new_text
         else:
-            raise PathResolutionError(f"Maximum replacement depth of {maximum_loop} depth reached.")
+            raise PathResolutionError(
+                f"Maximum replacement depth of {maximum_loop} depth reached."
+            )
         return text
+
     def _resolve_variable(
         self,
         variable: Union[List, ReferenceVariable],
-        idx : int,
-        all_indices : List[int],
+        idx: int,
+        all_indices: List[int],
     ) -> Any:
         """
         Resolve a variable value for a given selection index.
@@ -695,15 +737,17 @@ class GeneralWorkPathManager():
                     f"reference={ref_idx}, index={idx}."
                 ) from exc
         return variable[idx]
+
     ################################
     ### Get paths
     def resolve_path(
-        self, 
-        index: Union[List[int],Dict[str,int]], 
-        is_out: bool = False, 
-        starter: str = None, 
-        recursive:bool=False,
-        immutable:bool=False,):
+        self,
+        index: Union[List[int], Dict[str, int]],
+        is_out: bool = False,
+        starter: str = None,
+        recursive: bool = False,
+        immutable: bool = False,
+    ):
         """
         Build the wished file path by substituting placeholders tokens with
         the variables selected by `index`.
@@ -723,7 +767,7 @@ class GeneralWorkPathManager():
             placeholders token. If False (default), a single pass is applied.
         immutable : bool
             If True, makes this function immutable and the paths will not be saved in the class.
-            
+
         Returns
         -------
         Path
@@ -734,29 +778,34 @@ class GeneralWorkPathManager():
             raise PathResolutionError(
                 f"Expected {len(self.list_of_variables)} indices, "
                 f"received {len(index)}."
-                ) 
-        path, path_file = self._build_path(starter=starter,is_out=is_out)
-        variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
+            )
+        path, path_file = self._build_path(starter=starter, is_out=is_out)
+        variables = [
+            self._resolve_variable(variable, idx, index)
+            for variable, idx in zip(self.list_of_variables, index)
+        ]
         if recursive:
             self._check_loop_placeholders()
-            path        =self._resolve_recursive(path, variables)
-            path_file   = self._resolve_recursive(path_file, variables)
+            path = self._resolve_recursive(path, variables)
+            path_file = self._resolve_recursive(path_file, variables)
         else:
-            path        = self._apply_replacements(path, variables)
-            path_file   = self._apply_replacements(path_file, variables)
+            path = self._apply_replacements(path, variables)
+            path_file = self._apply_replacements(path_file, variables)
         if immutable:
             return Path(path_file)
-        self.current_path       = Path(path) 
-        self.current_path_file  = Path(path_file)
+        self.current_path = Path(path)
+        self.current_path_file = Path(path_file)
         return self.current_path_file
+
     def resolve_values(
         self,
         list_of_var: List[List[str]],
         is_out: bool = False,
         starter: str = None,
         output_file: str = None,
-        recursive:bool=False,
-        immutable:bool=False,):
+        recursive: bool = False,
+        immutable: bool = False,
+    ):
         """
         Build the wished file path by substituting placeholders tokens with
         manually supplied values (bypasses `self.list_of_variables`).
@@ -777,7 +826,7 @@ class GeneralWorkPathManager():
             token. If False (default), a single pass is applied.
         immutable : bool
             If True, makes this function immutable and the paths will not be saved in the class.
-            
+
         Returns
         -------
         Path
@@ -788,25 +837,25 @@ class GeneralWorkPathManager():
                 f"Expected {len(self.list_of_variables)} indices, "
                 f"received {len(list_of_var)}."
             )
-        path, path_file = self._build_path(starter=starter,is_out=is_out,output_file=output_file)
+        path, path_file = self._build_path(
+            starter=starter, is_out=is_out, output_file=output_file
+        )
         if recursive:
             self._check_loop_placeholders([[v] for v in list_of_var])
-            path        = self._resolve_recursive(path,list_of_var)
-            path_file   = self._resolve_recursive(path_file, list_of_var)
+            path = self._resolve_recursive(path, list_of_var)
+            path_file = self._resolve_recursive(path_file, list_of_var)
         else:
-            path        = self._apply_replacements(path,list_of_var)
-            path_file   = self._apply_replacements(path_file, list_of_var)
+            path = self._apply_replacements(path, list_of_var)
+            path_file = self._apply_replacements(path_file, list_of_var)
         if immutable:
             return Path(path_file)
-        self.current_path       = Path(path) 
-        self.current_path_file  = Path(path_file)
+        self.current_path = Path(path)
+        self.current_path_file = Path(path_file)
         return self.current_path_file
+
     def path_general_conversion(
-            self,
-            g_path:str,
-            g_file:str,
-            index: Union[List[int],Dict[str,int]]
-            )->Dict[ str, Any ]:
+        self, g_path: str, g_file: str, index: Union[List[int], Dict[str, int]]
+    ) -> Dict[str, Any]:
         """
         Apply a single replacement pass to a given path/file string.
 
@@ -824,20 +873,21 @@ class GeneralWorkPathManager():
                 f"received {len(index)}."
             )
         # Take data
-        variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
-        g_path_file = g_path if g_file == '' else str(Path(g_path) / g_file)
-        var_used    = self.placeholders_used(g_path_file)
+        variables = [
+            self._resolve_variable(variable, idx, index)
+            for variable, idx in zip(self.list_of_variables, index)
+        ]
+        g_path_file = g_path if g_file == "" else str(Path(g_path) / g_file)
+        var_used = self.placeholders_used(g_path_file)
         return {
-                "path": self._apply_replacements(g_path, variables),
-                "path_file": self._apply_replacements(g_path_file, variables),
-                "var_used": var_used,
-            }
+            "path": self._apply_replacements(g_path, variables),
+            "path_file": self._apply_replacements(g_path_file, variables),
+            "var_used": var_used,
+        }
+
     def path_recursive_general_conversion(
-            self,
-            g_path:str,
-            g_file:str,
-            index: Union[List[int],Dict[str,int]]
-            )->str:
+        self, g_path: str, g_file: str, index: Union[List[int], Dict[str, int]]
+    ) -> str:
         """
         Resolve a path/file string, repeating substitution until no
         placeholders token remains.
@@ -853,9 +903,13 @@ class GeneralWorkPathManager():
         """
         index = self._normalize_index(index)
         self._check_loop_placeholders()
-        variables = [ self._resolve_variable(variable, idx, index) for variable, idx in zip(self.list_of_variables, index) ]
+        variables = [
+            self._resolve_variable(variable, idx, index)
+            for variable, idx in zip(self.list_of_variables, index)
+        ]
         return self._resolve_recursive(g_path + g_file, variables)
-    def parse(self,path:str)->Dict[str,str]:
+
+    def parse(self, path: str) -> Dict[str, str]:
         """
         Extract variable values from a concrete path.
 
@@ -882,15 +936,16 @@ class GeneralWorkPathManager():
         >>> gwpm.parse("./Li/300K/output.dat")
         {'element': 'Li', 'temperature': '300K'}
         """
-        pattern = (self.general_path + self.file)
+        pattern = self.general_path + self.file
         regex = re.escape(pattern)
-        for placeholders, name in zip(self.placeholders,self.variable_names):
-            regex = regex.replace(re.escape(placeholders),f'(?P<{name}>.+)')
-        matching = re.match("^" + regex + '$', path)
+        for placeholders, name in zip(self.placeholders, self.variable_names):
+            regex = regex.replace(re.escape(placeholders), f"(?P<{name}>.+)")
+        matching = re.match("^" + regex + "$", path)
         if matching is None:
             raise PathResolutionError(f"Path does not match template: {path}.")
         return matching.groupdict()
-    def resolve(self, values : Optional[Dict[str,object]] = None, **kwargs) -> Path:
+
+    def resolve(self, values: Optional[Dict[str, object]] = None, **kwargs) -> Path:
         """
         Resolve a path from variable values rather than indices.
 
@@ -927,7 +982,7 @@ class GeneralWorkPathManager():
             values = {}
         values.update(kwargs)
         indices = []
-        for name, variable in zip(self.variable_names,self.list_of_variables):
+        for name, variable in zip(self.variable_names, self.list_of_variables):
             if name not in values:
                 raise KeyError(f"Missing variable '{name}'.")
             value = values[name]
@@ -936,15 +991,16 @@ class GeneralWorkPathManager():
             else:
                 if isinstance(variable, ReferenceVariable):
                     raise PathResolutionError(
-                        f"ReferenceVariable '{name}' must "
-                        f"be resolved using indices.")
+                        f"ReferenceVariable '{name}' must be resolved using indices."
+                    )
                 try:
                     indices.append(variable.index(value))
                 except ValueError as exc:
                     raise PathResolutionError(
                         f"{value} not available for {name}."
                     ) from exc
-        return self.resolve_path(indices,immutable=True)
+        return self.resolve_path(indices, immutable=True)
+
     ################################
     ### Get the data from the gwpm.
     def get_placeholder_series(
@@ -982,15 +1038,20 @@ class GeneralWorkPathManager():
                 starter=starter,
                 is_out=is_out,
             )
-        return PlaceholderSeries(path_file,placeholder=placeholder,)
+        return PlaceholderSeries(
+            path_file,
+            placeholder=placeholder,
+        )
+
     def read_placeholder_series(
         self,
-        reader:BaseSeriesReader,
+        reader: BaseSeriesReader,
         starter: str = None,
         is_out: bool = False,
-        is_merged:bool= True,
+        is_merged: bool = True,
         use_current: bool = True,
-        placeholder: str = "["):
+        placeholder: str = "[",
+    ):
         """
         Read files matching the current placeholder pattern.
 
@@ -1020,5 +1081,5 @@ class GeneralWorkPathManager():
             is_out=is_out,
             placeholder=placeholder,
             use_current=use_current,
-        ) 
-        return ( reader.read_merged(series) if is_merged else reader.read_all(series) )
+        )
+        return reader.read_merged(series) if is_merged else reader.read_all(series)

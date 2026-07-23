@@ -1,43 +1,45 @@
 from __future__ import annotations
 
-from typing import List, Union, Dict, Optional, TYPE_CHECKING
+from typing import List, Union, TYPE_CHECKING
 import os
 import re
 from pathlib import Path
 from abc import ABC, abstractmethod
 from functools import cached_property
 import pandas as pd
+
 ## ASE
 if TYPE_CHECKING:
     from ase import Atoms
     from pymatgen.core import Structure
 try:
     from ase.io import read
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     read = None
 try:
     from pymatgen.core import Structure
-except ImportError: # pragma: no cover
+except ImportError:  # pragma: no cover
     Structure = None
 
 ## Utils.
 from .utils import parse_lammps_dump
 from .exception import (
     PlaceHolderSeriesError,
-    BaseSeriesReaderError,
 )
+
+
 def _require_ase():
     if read is None:
-        raise ImportError(
-            "ASE is required. "
-            "Install with pip install gwpm[structures]"
-        )
+        raise ImportError("ASE is required. Install with pip install gwpm[structures]")
+
+
 def _require_pymatgen():
     if Structure is None:
         raise ImportError(
             "Pymatgen support is not installed. "
             "Install with: pip install gwpm[structures]"
         )
+
 
 class PlaceholderSeries:
     """
@@ -61,22 +63,28 @@ class PlaceholderSeries:
 
         "./simulations/000300.lammpsdump"
     """
+
     __version__ = "1.0.0"
-    def __init__(self,pattern: str,placeholder: str = "[",)->None:
+
+    def __init__(
+        self,
+        pattern: str,
+        placeholder: str = "[",
+    ) -> None:
         self.pattern = pattern
         self.placeholder = placeholder
         if pattern.count(placeholder) != 1:
             raise PlaceHolderSeriesError(
-                f"Pattern must contain exactly one placeholder "
-                f"('{placeholder}')."
+                f"Pattern must contain exactly one placeholder ('{placeholder}')."
             )
         self._regex = self._build_regex()
         self._width = self._find_width()
+
     def __repr__(self) -> str:
         return (
-            f"{self.__class__.__name__}("
-            f"pattern='{self.pattern}', "
-            f"n_values={len(self)})")
+            f"{self.__class__.__name__}(pattern='{self.pattern}', n_values={len(self)})"
+        )
+
     def __str__(self) -> str:
         return (
             f"{self.__class__.__name__}\n"
@@ -85,27 +93,35 @@ class PlaceholderSeries:
             f"├── width       : {self._width}\n"
             f"└── n_values    : {len(self)}"
         )
+
     def __len__(self) -> int:
         return len(self.values)
+
     def __iter__(self):
         return iter(self.values)
+
     def __getitem__(self, item):
         return self.values[item]
+
     def __contains__(self, item) -> bool:
         return item in self.values
+
     def __eq__(self, other) -> bool:
         if not isinstance(other, PlaceholderSeries):
             return False
-        return ( self.pattern == other.pattern and self.placeholder == other.placeholder )
+        return self.pattern == other.pattern and self.placeholder == other.placeholder
+
     def to_dict(self) -> dict:
         return {
             "pattern": self.pattern,
             "placeholder": self.placeholder,
         }
+
     @classmethod
     def from_dict(cls, data: dict):
-        return cls( pattern=data["pattern"], placeholder=data["placeholder"] )
-    def _build_regex(self)->re.Pattern:
+        return cls(pattern=data["pattern"], placeholder=data["placeholder"])
+
+    def _build_regex(self) -> re.Pattern:
         """
         Build the regular expression used to match files/folders.
 
@@ -117,10 +133,11 @@ class PlaceholderSeries:
         """
         name = Path(self.pattern).name
         escaped = re.escape(name)
-        escaped = escaped.replace(re.escape(self.placeholder),r"(\d+)")
+        escaped = escaped.replace(re.escape(self.placeholder), r"(\d+)")
         return re.compile(f"^{escaped}$")
+
     @property
-    def folder(self)->str:
+    def folder(self) -> str:
         """
         Parent directory containing the matching files/folders.
 
@@ -130,7 +147,8 @@ class PlaceholderSeries:
             Path to the parent directory.
         """
         return str(Path(self.pattern).parent)
-    def _find_width(self)->int:
+
+    def _find_width(self) -> int:
         """
         Determine the width of the numeric field.
 
@@ -150,8 +168,9 @@ class PlaceholderSeries:
             if match:
                 widths.append(len(match.group(1)))
         return max(widths) if widths else 1
+
     @cached_property
-    def values(self)->List[int]:
+    def values(self) -> List[int]:
         """
         Extract all integer values matching the placeholder pattern.
 
@@ -180,8 +199,9 @@ class PlaceholderSeries:
             if match:
                 values.append(int(match.group(1)))
         return sorted(values)
+
     @property
-    def names(self)->List[str]:
+    def names(self) -> List[str]:
         """
         Return matching file/folder names.
 
@@ -192,8 +212,9 @@ class PlaceholderSeries:
             values.
         """
         return [os.path.basename(self.get_path(v)) for v in self.values]
+
     @property
-    def paths(self)->List[str]:
+    def paths(self) -> List[str]:
         """
         Return matching file/folder paths.
 
@@ -203,30 +224,38 @@ class PlaceholderSeries:
             Sorted absolute or relative paths corresponding to the
             discovered placeholder values.
         """
-        return [ self.get_path(v) for v in self.values ]
+        return [self.get_path(v) for v in self.values]
+
     @property
     def first(self) -> str | None:
         """
         Return the first path in the series.
         """
         return self.paths[0] if self.paths else None
+
     @property
     def last(self) -> str | None:
         """
         Return the last path in the series.
         """
         return self.paths[-1] if self.paths else None
+
     def exists(self, value: int) -> bool:
         """
         Check whether a given series value exists.
         """
         return value in self.values
+
     def index(self, value: int) -> int:
         """
         Return the position of a value in the series.
         """
         return self.values.index(value)
-    def get_path(self,value: int,) -> str:
+
+    def get_path(
+        self,
+        value: int,
+    ) -> str:
         """
         Build a path corresponding to a placeholder value.
 
@@ -246,14 +275,16 @@ class PlaceholderSeries:
         existing matching files/folders.
         """
         replacement = str(value).zfill(self._width)
-        return self.pattern.replace( self.placeholder, replacement)
+        return self.pattern.replace(self.placeholder, replacement)
+
+
 ### Series Readers.
 class BaseSeriesReader(ABC):
     """
     Abstract base class for reading placeholder series.
 
     Subclasses must implement the ``read`` method.
-    
+
     Notes
     -----
     A reader implementation is responsible for:
@@ -264,13 +295,17 @@ class BaseSeriesReader(ABC):
     The helper methods ``read_all`` and ``read_merged`` provide
     generic implementations based on these two operations.
     """
+
     __version__ = "1.0.0"
+
     def __repr__(self) -> str:
-        return (f"{self.__class__.__name__}()")
+        return f"{self.__class__.__name__}()"
+
     def __str__(self) -> str:
         return self.__repr__()
+
     @abstractmethod
-    def read(self, path:str):
+    def read(self, path: str):
         """
         Read a single file.
 
@@ -285,7 +320,11 @@ class BaseSeriesReader(ABC):
             Parsed content of the file.
         """
         pass
-    def read_all(self,series: PlaceholderSeries,):
+
+    def read_all(
+        self,
+        series: PlaceholderSeries,
+    ):
         """
         Read all files belonging to a placeholder series.
 
@@ -299,7 +338,8 @@ class BaseSeriesReader(ABC):
         List
             List containing the result of reading each file.
         """
-        return [ self.read(path) for path in series.paths ]
+        return [self.read(path) for path in series.paths]
+
     def merge(self, data):
         """
         Merge the results produced by ``read_all``.
@@ -323,6 +363,7 @@ class BaseSeriesReader(ABC):
         meaningful merge operation.
         """
         return data
+
     def read_merged(self, series):
         """
         Read and merge all files belonging to a placeholder series.
@@ -345,11 +386,17 @@ class BaseSeriesReader(ABC):
             The exact type depends on the reader implementation.
         """
         return self.merge(self.read_all(series))
+
+
 class CSVReader(BaseSeriesReader):
     """
     Reader for CSV files using pandas.
     """
-    def __init__(self,**kwargs,):
+
+    def __init__(
+        self,
+        **kwargs,
+    ):
         """
         Parameters
         ----------
@@ -358,11 +405,14 @@ class CSVReader(BaseSeriesReader):
             ``pandas.read_csv``.
         """
         self.kwargs = kwargs
+
     def __repr__(self) -> str:
-        return ( f"CSVReader(kwargs={self.kwargs})" )
+        return f"CSVReader(kwargs={self.kwargs})"
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str)->pd.DataFrame:
+
+    def read(self, path: str) -> pd.DataFrame:
         """
         Read a CSV file.
 
@@ -376,8 +426,12 @@ class CSVReader(BaseSeriesReader):
         pandas.DataFrame
             Loaded CSV data.
         """
-        return pd.read_csv(path, **self.kwargs, )
-    def merge(self, data)->pd.DataFrame:
+        return pd.read_csv(
+            path,
+            **self.kwargs,
+        )
+
+    def merge(self, data) -> pd.DataFrame:
         """
         Concatenate multiple DataFrames into a single DataFrame.
 
@@ -396,12 +450,21 @@ class CSVReader(BaseSeriesReader):
         -----
         The index is reset during concatenation.
         """
-        return pd.concat(data,ignore_index=True,)
+        return pd.concat(
+            data,
+            ignore_index=True,
+        )
+
+
 class ASEReader(BaseSeriesReader):
     """
     Reader for ASE-supported structure and trajectory files.
     """
-    def __init__(self,index=":",):
+
+    def __init__(
+        self,
+        index=":",
+    ):
         """
         Parameters
         ----------
@@ -416,11 +479,14 @@ class ASEReader(BaseSeriesReader):
             Default is ":".
         """
         self.index = index
+
     def __repr__(self) -> str:
-        return (f"ASEReader(index={self.index!r})")
+        return f"ASEReader(index={self.index!r})"
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str) -> Union[Atoms, List[Atoms]]:
+
+    def read(self, path: str) -> Union[Atoms, List[Atoms]]:
         """
         Read an ASE-supported file.
 
@@ -435,8 +501,12 @@ class ASEReader(BaseSeriesReader):
             Structure(s) returned by ASE.
         """
         _require_ase()
-        return read(path,self.index,)
-    def merge(self, data)->List[Atoms]:
+        return read(
+            path,
+            self.index,
+        )
+
+    def merge(self, data) -> List[Atoms]:
         """
         Merge multiple ASE trajectories into a single trajectory.
 
@@ -455,11 +525,18 @@ class ASEReader(BaseSeriesReader):
         for traj in data:
             all_atoms.extend(traj)
         return all_atoms
+
+
 class LammpsDumpReader(BaseSeriesReader):
     """
     Reader for LAMMPS dump files using ``parse_lammps_dump``.
     """
-    def __init__(self, Z_of_type=None, index_atom=":",):
+
+    def __init__(
+        self,
+        Z_of_type=None,
+        index_atom=":",
+    ):
         """
         Parameters
         ----------
@@ -478,13 +555,18 @@ class LammpsDumpReader(BaseSeriesReader):
         """
         self.Z_of_type = Z_of_type
         self.index_atom = index_atom
+
     def __repr__(self) -> str:
-        return (f"LammpsDumpReader("
+        return (
+            f"LammpsDumpReader("
             f"index_atom={self.index_atom!r}, "
-            f"Z_of_type={self.Z_of_type})")
+            f"Z_of_type={self.Z_of_type})"
+        )
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str)->List[Atoms]:
+
+    def read(self, path: str) -> List[Atoms]:
         """
         Read a LAMMPS dump file.
 
@@ -504,7 +586,8 @@ class LammpsDumpReader(BaseSeriesReader):
             self.Z_of_type,
             self.index_atom,
         )
-    def merge(self, data)->List[Atoms]:
+
+    def merge(self, data) -> List[Atoms]:
         """
         Merge multiple LAMMPS dump trajectories.
 
@@ -523,6 +606,8 @@ class LammpsDumpReader(BaseSeriesReader):
         for traj in data:
             all_atoms.extend(traj)
         return all_atoms
+
+
 class LammpsLogReader(BaseSeriesReader):
     """
     Reader for standard LAMMPS log files.
@@ -531,11 +616,14 @@ class LammpsLogReader(BaseSeriesReader):
     containing "Step" and "Loop" is converted into a
     pandas DataFrame.
     """
+
     def __repr__(self) -> str:
         return "LammpsLogReader()"
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str)->pd.DataFrame:
+
+    def read(self, path: str) -> pd.DataFrame:
         """
         Read a LAMMPS log file.
 
@@ -578,8 +666,11 @@ class LammpsLogReader(BaseSeriesReader):
                 "KinEng",
                 "TotEng",
                 "Press",
-            ],dtype=float,)
-    def merge(self, data)->pd.DataFrame:
+            ],
+            dtype=float,
+        )
+
+    def merge(self, data) -> pd.DataFrame:
         """
         Concatenate LAMMPS thermodynamic logs while preserving
         step continuity.
@@ -604,11 +695,16 @@ class LammpsLogReader(BaseSeriesReader):
         result = pd.DataFrame()
         for df in data:
             if not result.empty:
-                last_step = (result["Step"].iloc[-1])
+                last_step = result["Step"].iloc[-1]
                 df = df.copy()
                 df["Step"] += last_step
-            result = pd.concat([result, df],ignore_index=True,)
+            result = pd.concat(
+                [result, df],
+                ignore_index=True,
+            )
         return result
+
+
 class FunctionReader(BaseSeriesReader):
     """
     Reader wrapper around a user-defined function.
@@ -616,7 +712,11 @@ class FunctionReader(BaseSeriesReader):
     This class makes it possible to use any custom file
     parser with the ``BaseSeriesReader`` interface.
     """
-    def __init__(self,read_function,):
+
+    def __init__(
+        self,
+        read_function,
+    ):
         """
         Parameters
         ----------
@@ -632,16 +732,15 @@ class FunctionReader(BaseSeriesReader):
         >>> reader = FunctionReader(read_my_file)
         """
         self.read_function = read_function
+
     def __repr__(self) -> str:
-        name = getattr(
-            self.read_function,
-            "__name__",
-            "anonymous")
-        return (f"FunctionReader("
-            f"read_function='{name}')")
+        name = getattr(self.read_function, "__name__", "anonymous")
+        return f"FunctionReader(read_function='{name}')"
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str):
+
+    def read(self, path: str):
         """
         Read a file using the user-provided function.
 
@@ -656,8 +755,13 @@ class FunctionReader(BaseSeriesReader):
             Result returned by ``read_function``.
         """
         return self.read_function(path)
+
+
 class ThermoLogReader(BaseSeriesReader):
-    def __init__(self,timestep_fs=None,)->None:
+    def __init__(
+        self,
+        timestep_fs=None,
+    ) -> None:
         """
         Reader for thermo_*.log file type saved used ASE.
 
@@ -667,12 +771,14 @@ class ThermoLogReader(BaseSeriesReader):
             MD timestep in fs.
         """
         self.timestep_fs = timestep_fs
+
     def __repr__(self) -> str:
-        return (f"ThermoLogReader("
-            f"timestep_fs={self.timestep_fs})")
+        return f"ThermoLogReader(timestep_fs={self.timestep_fs})"
+
     def __str__(self) -> str:
         return self.__repr__()
-    def read(self, path:str)->pd.DataFrame:
+
+    def read(self, path: str) -> pd.DataFrame:
         """
         Read a thermo_*.log file.
 
@@ -700,15 +806,21 @@ class ThermoLogReader(BaseSeriesReader):
             df["time_fs"] = df["step"] * self.timestep_fs
             df["time_ps"] = df["time_fs"] * 1e-3
         return df
-    def merge(self, data)->pd.DataFrame:
+
+    def merge(self, data) -> pd.DataFrame:
         result = pd.DataFrame()
         for df in data:
             if not result.empty:
-                last_step = (result["step"].iloc[-1])
+                last_step = result["step"].iloc[-1]
                 df = df.copy()
                 df["step"] += last_step
-            result = pd.concat([result, df],ignore_index=True,)
+            result = pd.concat(
+                [result, df],
+                ignore_index=True,
+            )
         return result
+
+
 class PymatgenReader(FunctionReader):
     """
     Reader wrapper for pymatgen file readers.
@@ -716,10 +828,12 @@ class PymatgenReader(FunctionReader):
     Any pymatgen reader function may be supplied, for example
     ``Structure.from_file`` or ``Molecule.from_file``.
     """
+
     def __init__(
         self,
         read_function,
-        **kwargs,) -> None:
+        **kwargs,
+    ) -> None:
         """
         Parameters
         ----------
@@ -735,15 +849,14 @@ class PymatgenReader(FunctionReader):
             raise TypeError("read_function must be callable.")
         super().__init__(read_function)
         self.kwargs = kwargs
+
     def __repr__(self) -> str:
         name = getattr(self.read_function, "__name__", "anonymous")
-        return (
-            f"PymatgenReader("
-            f"read_function='{name}', "
-            f"kwargs={self.kwargs})"
-        )
+        return f"PymatgenReader(read_function='{name}', kwargs={self.kwargs})"
+
     def __str__(self) -> str:
         return self.__repr__()
+
     def read(self, path: str):
         """
         Read a file using the selected pymatgen reader.

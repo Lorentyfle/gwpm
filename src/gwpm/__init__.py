@@ -32,10 +32,7 @@ from .series_reader import (
     BaseSeriesReaderError,
 )
 
-from .utils import (
-    check_folder,
-    variable_to_string
-)
+from .utils import check_folder, variable_to_string
 
 
 from .exception import (
@@ -50,14 +47,11 @@ from .exception import (
 
 __all__ = [
     "__version__",
-
     # Main GWPM classes
     "GeneralWorkPathManager",
     "ReferenceVariable",
-
     # Series objects
     "PlaceholderSeries",
-
     # Readers
     "BaseSeriesReader",
     "CSVReader",
@@ -66,7 +60,6 @@ __all__ = [
     "LammpsLogReader",
     "FunctionReader",
     "ThermoLogReader",
-
     # GWPM exceptions
     "GWPMError",
     "ReferenceResolutionError",
@@ -74,7 +67,6 @@ __all__ = [
     "DependencyLoopError",
     "PathResolutionError",
     "SerializationError",
-
     # Series exceptions
     "PlaceHolderSeriesError",
     "BaseSeriesReaderError",

@@ -11,4 +11,4 @@ gwpm = GeneralWorkPathManager(
     file="$",
 )
 
-print(gwpm.resolve_path([0, 0, 0],recursive=True,immutable=True))
+print(gwpm.resolve_path([0, 0, 0], recursive=True, immutable=True))
