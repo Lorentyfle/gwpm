@@ -1,4 +1,5 @@
 test/__pycache__
 src/gwpm/__pycache__
-src/gwpm.egg-info
 build
+dist
+*.egg-info/

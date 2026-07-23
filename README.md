@@ -91,7 +91,8 @@ gwpm.resolve_path({"structure": 1, "temperature": 1})
 # './simulations/Li2S/1200K/'
 for struct_idx in range(len(struct)):
     for i, temp in enumerate(temperatures):
-        gwpm.resolve_path([struct_idx,i]) ## gwpm can be view index locally if you wish to be less verbose.
+        ## gwpm can be view index locally if you wish to be less verbose.
+        gwpm.resolve_path([struct_idx,i])
         read(gwpm.current_path_file)
 ```
 
