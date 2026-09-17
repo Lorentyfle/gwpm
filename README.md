@@ -124,6 +124,36 @@ for struct_idx in range(len(struct)):
         # Return the atoms file of all the 000X.xyz files in the current folder.
 ```
 
+### Simple example usage of the recursivity
+
+```python
+from gwpm import GeneralWorkPathManager
+
+struct       = ["Li2O", "Li2S"]
+temperatures = ["simulations/?/300K/", "simulations/?/600K/", "simulations/?/900K/"]
+
+gwpm = GeneralWorkPathManager(
+    list_of_variables=[
+        struct,
+        temperatures,
+    ],
+    variable_names=[
+        "structure",
+        "temperature",
+    ],
+    path="./",
+    placeholders=["?", "!"],
+)
+
+gwpm.resolve_path({"structure": 0, "temperature": 1})
+# './simulations/Li2O/600K/'
+for struct_idx in range(len(struct)):
+    for temperature_idx in range(len(temperatures)):
+        gwpm.resolve_path({"structure": struct_idx, "temperature": temperature_idx})
+        print(gwpm.current_path)
+```
+
+
 
 ## API reference
 
