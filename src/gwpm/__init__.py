@@ -37,6 +37,7 @@ from .exception import (
     DependencyLoopError,
     SerializationError,
     PlaceHolderSeriesError,
+    BaseSeriesReaderError,
 )
 
 __all__ = [
