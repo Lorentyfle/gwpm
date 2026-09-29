@@ -1,5 +1,11 @@
 # gwpm — GeneralWorkPathManager
 
+[![Python package](https://github.com/Lorentyfle/gwpm/actions/workflows/python-package.yml/badge.svg?branch=main)](https://github.com/Lorentyfle/gwpm/actions/workflows/python-package.yml)
+[![Python](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://github.com/Lorentyfle/gwpm/blob/main/setup.py)
+[![License: MIT](https://img.shields.io/github/license/Lorentyfle/gwpm)](https://github.com/Lorentyfle/gwpm/blob/main/LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
+
 This library aims to provide a common and reusable way to manage path templates, while remaining straightforward, lightweight, and robust.
 
 Indeed, everyone has their own solution to construct paths and folder systems. The goal is to adapt to existing workflows while keeping path generation straightforward and less error-prone.
