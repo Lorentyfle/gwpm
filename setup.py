@@ -31,7 +31,7 @@ setup(
         # Only needed if StructureIO or specific series_reader are used.
         "structures": ["ase", "pymatgen"],
         "test": ["pytest", "ase", "pymatgen"],
-        "dev": ["pytest", "black", "ruff", "ase", "pymatgen"],
+        "dev": ["pytest", "black", "ruff>=0.12,<0.17", "ase", "pymatgen"],
     },
     zip_safe=False,
     include_package_data=True,
