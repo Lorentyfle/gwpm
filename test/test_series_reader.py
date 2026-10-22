@@ -9,12 +9,22 @@ from gwpm import (
     LammpsDumpReader,
     ThermoLogReader,
     PlaceHolderSeriesError,
+    BaseSeriesReaderError,
 )
 
 ### ASE reader test using ASE for testing.
 from unittest.mock import patch
 from ase import Atoms
 from gwpm import ASEReader, PymatgenReader
+
+
+def write_dump(path, columns, frames, box="pp pp pp", bounds=("0 1",) * 3):
+    """Write a LAMMPS dump, one list of atom lines per frame."""
+    with open(path, "w") as f:
+        for step, atoms in enumerate(frames):
+            f.write(f"ITEM: TIMESTEP\n{step}\nITEM: NUMBER OF ATOMS\n{len(atoms)}\n")
+            f.write(f"ITEM: BOX BOUNDS {box}\n" + "\n".join(bounds) + "\n")
+            f.write(f"ITEM: ATOMS {columns}\n" + "\n".join(atoms) + "\n")
 
 
 ## Import tests.
@@ -38,7 +48,7 @@ def test_require_pymatgen(monkeypatch):
 # PlaceholderSeries
 # ==========================================================
 def test_placeholder_series_values_missing_folder(tmp_path):
-    series = PlaceholderSeries(str(tmp_path / "does_not_exist" / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "does_not_exist" / "<ID>.txt"))
     assert series.values == []
 
 
@@ -53,19 +63,19 @@ def test_base_series_reader_repr():
 
 
 def test_placeholder_series_creation(tmp_path):
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
-    assert series.placeholder == "["
+    assert series.placeholder == "<ID>"
     assert series.folder == str(tmp_path)
 
 
 def test_placeholder_series_invalid_placeholder_count():
     with pytest.raises(PlaceHolderSeriesError):
-        PlaceholderSeries("[_[.txt")
+        PlaceholderSeries("<ID>_<ID>.txt")
 
 
 def test_placeholder_series_empty_directory(tmp_path):
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert len(series) == 0
     assert series.values == []
@@ -76,7 +86,7 @@ def test_placeholder_series_values(tmp_path):
     (tmp_path / "000100.txt").touch()
     (tmp_path / "000050.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.values == [1, 50, 100]
 
@@ -84,7 +94,7 @@ def test_placeholder_series_values(tmp_path):
 def test_placeholder_series_width(tmp_path):
     (tmp_path / "000123.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series._width == 6
 
@@ -93,7 +103,7 @@ def test_placeholder_series_names(tmp_path):
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000002.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.names == [
         "000001.txt",
@@ -105,7 +115,7 @@ def test_placeholder_series_paths(tmp_path):
     file = tmp_path / "000001.txt"
     file.touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.paths == [str(file)]
 
@@ -114,7 +124,7 @@ def test_placeholder_series_first_last(tmp_path):
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000010.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.first.endswith("000001.txt")
     assert series.last.endswith("000010.txt")
@@ -123,7 +133,7 @@ def test_placeholder_series_first_last(tmp_path):
 def test_placeholder_series_exists(tmp_path):
     (tmp_path / "000010.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.exists(10)
     assert not series.exists(15)
@@ -133,7 +143,7 @@ def test_placeholder_series_index(tmp_path):
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000100.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert series.index(100) == 1
 
@@ -141,7 +151,7 @@ def test_placeholder_series_index(tmp_path):
 def test_placeholder_series_get_path(tmp_path):
     (tmp_path / "000001.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     expected = str(tmp_path / "000300.txt")
 
@@ -151,7 +161,7 @@ def test_placeholder_series_get_path(tmp_path):
 def test_placeholder_series_contains(tmp_path):
     (tmp_path / "000001.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert 1 in series
     assert 10 not in series
@@ -161,35 +171,35 @@ def test_placeholder_series_iter(tmp_path):
     (tmp_path / "000001.txt").touch()
     (tmp_path / "000002.txt").touch()
 
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     assert list(series) == [1, 2]
 
 
 def test_placeholder_series_to_dict():
-    series = PlaceholderSeries("./[.txt")
+    series = PlaceholderSeries("./<ID>.txt")
 
     assert series.to_dict() == {
-        "pattern": "./[.txt",
-        "placeholder": "[",
+        "pattern": "./<ID>.txt",
+        "placeholder": "<ID>",
     }
 
 
 def test_placeholder_series_from_dict():
     series = PlaceholderSeries.from_dict(
         {
-            "pattern": "./[.txt",
-            "placeholder": "[",
+            "pattern": "./<ID>.txt",
+            "placeholder": "<ID>",
         }
     )
 
-    assert series.pattern == "./[.txt"
-    assert series.placeholder == "["
+    assert series.pattern == "./<ID>.txt"
+    assert series.placeholder == "<ID>"
 
 
 def test_placeholder_series_equality():
-    s1 = PlaceholderSeries("./[.txt")
-    s2 = PlaceholderSeries("./[.txt")
+    s1 = PlaceholderSeries("./<ID>.txt")
+    s2 = PlaceholderSeries("./<ID>.txt")
     s3 = PlaceholderSeries("./@.txt", placeholder="@")
 
     assert s1 == s2
@@ -197,14 +207,14 @@ def test_placeholder_series_equality():
 
 
 def test_placeholder_series_repr(tmp_path):
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
     result = repr(series)
     assert "PlaceholderSeries" in result
     assert "pattern=" in result
 
 
 def test_placeholder_series_str(tmp_path):
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
 
     text = str(series)
 
@@ -217,12 +227,12 @@ def test_placeholder_series_str(tmp_path):
 
 def test_placeholder_series_getitem(tmp_path):
     (tmp_path / "001.txt").touch()
-    series = PlaceholderSeries(str(tmp_path / "[.txt"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
     assert series[0] == 1
 
 
 def test_placeholder_series_eq_returns_false_for_other_object():
-    series = PlaceholderSeries("./[.txt")
+    series = PlaceholderSeries("./<ID>.txt")
     assert series.__eq__(123) is False
 
 
@@ -630,7 +640,7 @@ def test_ase_reader_read_all(mock_read, tmp_path):
 
     mock_read.return_value = ["atoms"]
 
-    series = PlaceholderSeries(str(tmp_path / "[.xyz"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.xyz"))
 
     reader = ASEReader()
 
@@ -651,7 +661,7 @@ def test_ase_reader_read_merged(mock_read, tmp_path):
         ["c"],
     ]
 
-    series = PlaceholderSeries(str(tmp_path / "[.xyz"))
+    series = PlaceholderSeries(str(tmp_path / "<ID>.xyz"))
 
     reader = ASEReader()
 
@@ -785,3 +795,264 @@ def test_pymatgen_reader_read_merged():
         "FILE_1",
         "FILE_2",
     ]
+
+
+# ==========================================================
+# Missing files (issue #1).
+# ==========================================================
+def test_read_all_missing_folder(tmp_path):
+    series = PlaceholderSeries(str(tmp_path / "missing" / "log_<ID>.lammps"))
+
+    with pytest.raises(BaseSeriesReaderError, match="Folder not found"):
+        LammpsLogReader().read_merged(series)
+
+
+def test_read_all_no_matching_file(tmp_path):
+    (tmp_path / "other.txt").touch()
+    series = PlaceholderSeries(str(tmp_path / "log_<ID>.lammps"))
+
+    with pytest.raises(BaseSeriesReaderError, match="No file matching"):
+        LammpsLogReader().read_merged(series)
+
+
+def test_lammps_log_reader_no_thermo_table(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text("LAMMPS (2 Aug 2023)\nERROR: something\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="No thermo table"):
+        LammpsLogReader().read(str(path))
+
+
+# ==========================================================
+# Reading errors.
+# ==========================================================
+def test_placeholder_series_unpadded_paths(tmp_path):
+    for i in [1, 2, 10]:
+        (tmp_path / f"log_{i}.txt").touch()
+
+    series = PlaceholderSeries(str(tmp_path / "log_<ID>.txt"))
+
+    assert series.names == ["log_1.txt", "log_2.txt", "log_10.txt"]
+    assert series.get_path(20) == str(tmp_path / "log_20.txt")
+
+
+def test_placeholder_series_duplicate_value(tmp_path):
+    (tmp_path / "1.txt").touch()
+    (tmp_path / "01.txt").touch()
+
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
+
+    with pytest.raises(PlaceHolderSeriesError, match="found twice"):
+        series.values
+
+
+def test_placeholder_series_placeholder_in_folder(tmp_path):
+    with pytest.raises(PlaceHolderSeriesError, match="last part"):
+        PlaceholderSeries(str(tmp_path / "run_<ID>" / "x.txt"))
+
+
+def test_ase_reader_merge_int_index():
+    reader = ASEReader(index=-1)
+    a, b = Atoms("Cu"), Atoms("Al")
+
+    assert reader.merge([a, b]) == [a, b]
+
+
+def test_lammps_dump_reader_no_z_of_type(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(path, "id type x y z", [["1 1 0 0 0"]])
+
+    with pytest.raises(BaseSeriesReaderError, match="Z_of_type"):
+        LammpsDumpReader().read(str(path))
+
+
+@patch("gwpm.series_reader.parse_lammps_dump", return_value=[])
+def test_lammps_dump_reader_no_structure(mock_parse):
+    with pytest.raises(BaseSeriesReaderError, match="No structure"):
+        LammpsDumpReader(Z_of_type={1: "Li"}, index_atom=5).read("dump.lammpstrj")
+
+
+def test_lammps_log_reader_several_runs(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text(
+        """Step Temp PotEng
+0 300 -10
+100 301 -11
+Loop time of 1.0
+Step Temp PotEng Press
+100 301 -11 1
+WARNING: something not fatal
+200 302 -12 2
+Loop time of 1.0
+"""
+    )
+
+    df = LammpsLogReader().read(str(path))
+
+    assert df["Step"].tolist() == [0, 100, 100, 200]
+    assert list(df.columns) == ["Step", "Temp", "PotEng", "Press"]
+    assert df["Press"].isna().tolist() == [True, True, False, False]
+
+
+def test_lammps_log_reader_error(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text("Step Temp\n0 300\nERROR: Lost atoms\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="Lost atoms"):
+        LammpsLogReader().read(str(path))
+
+
+def test_lammps_log_reader_not_closed(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text("Step Temp\n0 300\n10 301\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="not closed"):
+        LammpsLogReader().read(str(path))
+
+
+def test_lammps_log_reader_wrong_line(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text("Step Temp\n0 300 1\nLoop time\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="Line 2"):
+        LammpsLogReader().read(str(path))
+
+
+def test_thermo_log_reader_missing_columns(tmp_path):
+    path = tmp_path / "thermo.log"
+    path.write_text("#step T\n0 300\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="E_pot"):
+        ThermoLogReader().read(str(path))
+
+
+def test_thermo_log_reader_missing_step_with_timestep(tmp_path):
+    path = tmp_path / "thermo.log"
+    path.write_text("#E_pot(eV) E_kin(eV)\n0 0\n")
+
+    with pytest.raises(BaseSeriesReaderError, match="step"):
+        ThermoLogReader(timestep_fs=2.0).read(str(path))
+
+
+# ==========================================================
+# Stress test fixes.
+# ==========================================================
+def test_placeholder_series_sees_new_files(tmp_path):
+    (tmp_path / "1.txt").touch()
+    series = PlaceholderSeries(str(tmp_path / "<ID>.txt"))
+    assert series.values == [1]
+
+    (tmp_path / "2.txt").touch()
+
+    assert series.values == [1, 2]
+    assert series.last == str(tmp_path / "2.txt")
+
+
+def test_placeholder_series_path_object(tmp_path):
+    (tmp_path / "1.txt").touch()
+
+    assert PlaceholderSeries(tmp_path / "<ID>.txt").values == [1]
+
+
+def test_placeholder_series_folder_names(tmp_path):
+    (tmp_path / "run_1").mkdir()
+
+    assert PlaceholderSeries(str(tmp_path / "run_<ID>") + "/").names == ["run_1"]
+
+
+def test_lammps_log_reader_skips_text_lines(tmp_path):
+    path = tmp_path / "log.lammps"
+    path.write_text(
+        "Step Temp\n0 300\nSHAKE stats (type/ave/delta/count) on step 0\n10 301\nLoop time\n"
+    )
+
+    assert LammpsLogReader().read(str(path))["Step"].tolist() == [0, 10]
+
+
+def test_lammps_dump_variable_number_of_atoms(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    frames = [
+        [f"{i + 1} 1 {k} 0 0" for i in range(n)] for k, n in enumerate([1, 2, 1, 2])
+    ]
+    write_dump(path, "id type x y z", frames)
+
+    last = LammpsDumpReader({1: "Li"}, -1).read(str(path))
+    every_other = LammpsDumpReader({1: "Li"}, "1::2").read(str(path))
+
+    assert [len(a) for a in last] == [2]
+    assert last[0].positions[:, 0].tolist() == [3.0, 3.0]
+    assert [len(a) for a in every_other] == [2, 2]
+
+
+def test_lammps_dump_string_index(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(path, "id type x y z", [[f"1 1 {k} 0 0"] for k in range(3)])
+
+    atoms = LammpsDumpReader({1: "Li"}, "-1").read(str(path))
+
+    assert len(atoms) == 1
+    assert atoms[0].positions[0, 0] == 2.0
+
+
+def test_lammps_dump_triclinic(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(
+        path,
+        "id type x y z",
+        [["1 1 0 0 0"]],
+        box="xy xz yz pp pp pp",
+        bounds=("0 3 1", "0 2 0", "0 2 0"),
+    )
+
+    cell = LammpsDumpReader({1: "Li"}).read(str(path))[0].cell.array
+
+    assert cell.tolist() == [[2.0, 0.0, 0.0], [1.0, 2.0, 0.0], [0.0, 0.0, 2.0]]
+
+
+def test_lammps_dump_scaled_positions(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(path, "id type xs ys zs", [["1 1 0.5 0.5 0.5"]], bounds=("0 2",) * 3)
+
+    atoms = LammpsDumpReader({1: "Li"}).read(str(path))[0]
+
+    assert atoms.positions[0].tolist() == [1.0, 1.0, 1.0]
+
+
+def test_lammps_dump_element_column(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(path, "id element x y z", [["1 Li 0 0 0"]])
+
+    assert LammpsDumpReader().read(str(path))[0].get_chemical_symbols() == ["Li"]
+
+
+def test_lammps_dump_no_positions(tmp_path):
+    path = tmp_path / "dump.lammpstrj"
+    write_dump(path, "id type vx vy vz", [["1 1 0 0 0"]])
+
+    with pytest.raises(BaseSeriesReaderError, match="No position columns"):
+        LammpsDumpReader({1: "Li"}).read(str(path))
+
+
+def test_function_reader_not_callable():
+    with pytest.raises(TypeError):
+        FunctionReader("x")
+
+
+@pytest.mark.parametrize(
+    "second, expected",
+    [
+        ([0, 10], [0, 10, 10, 20]),
+        ([10, 20], [0, 10, 10, 20]),
+        ([20, 30], [0, 10, 20, 30]),
+    ],
+)
+def test_log_merge_steps_restart_or_continue(second, expected):
+    first = pd.DataFrame({"Step": [0, 10]})
+
+    merged = LammpsLogReader().merge([first, pd.DataFrame({"Step": second})])
+    thermo = ThermoLogReader().merge(
+        [first.rename(columns={"Step": "step"}), pd.DataFrame({"step": second})]
+    )
+
+    assert merged["Step"].tolist() == expected
+    assert thermo["step"].tolist() == expected

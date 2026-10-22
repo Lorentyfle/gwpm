@@ -38,13 +38,13 @@ class SerializationError(GWPMError):
 
 
 #####
-class PlaceHolderSeriesError(Exception):
+class PlaceHolderSeriesError(GWPMError):
     """Raised when a Placeholder series fails."""
 
     pass
 
 
-class BaseSeriesReaderError(Exception):
+class BaseSeriesReaderError(GWPMError):
     """Raised when a BaseSeriesReader fails to read the file."""
 
     pass
