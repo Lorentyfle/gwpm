@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from typing import List, Union, TYPE_CHECKING
+from typing import List, Dict, Union, TYPE_CHECKING
 import os
 import re
 from pathlib import Path
 from abc import ABC, abstractmethod
-from functools import cached_property
 import pandas as pd
 
 ## ASE
@@ -25,7 +24,36 @@ except ImportError:  # pragma: no cover
 from .utils import parse_lammps_dump
 from .exception import (
     PlaceHolderSeriesError,
+    BaseSeriesReaderError,
 )
+
+
+def _continue_steps(data: List[pd.DataFrame], column: str) -> pd.DataFrame:
+    """
+    Concatenate successive runs, shifting the steps of a run that
+    restarted its step count so that they continue the previous run.
+    """
+    result = pd.DataFrame()
+    for df in data:
+        if not result.empty and not df.empty:
+            last_step = result[column].iloc[-1]
+            first_step = df[column].iloc[0]
+            if first_step < last_step:
+                df = df.copy()
+                df[column] += last_step - first_step
+        result = pd.concat(
+            [result, df],
+            ignore_index=True,
+        )
+    return result
+
+
+def _is_number(text: str) -> bool:
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
 
 
 def _require_ase():
@@ -47,7 +75,7 @@ class PlaceholderSeries:
 
     Example
     -------
-    pattern = "./simulations/[.lammpsdump"
+    pattern = "./simulations/<ID>.lammpsdump"
 
     Existing files:
 
@@ -64,21 +92,26 @@ class PlaceholderSeries:
         "./simulations/000300.lammpsdump"
     """
 
-    __version__ = "1.0.0"
+    __version__ = "1.1.0"
 
     def __init__(
         self,
-        pattern: str,
-        placeholder: str = "[",
+        pattern: Union[str, Path],
+        placeholder: str = "<ID>",
     ) -> None:
+        pattern = str(pattern)
         self.pattern = pattern
         self.placeholder = placeholder
         if pattern.count(placeholder) != 1:
             raise PlaceHolderSeriesError(
                 f"Pattern must contain exactly one placeholder ('{placeholder}')."
             )
+        if placeholder in str(Path(pattern).parent):
+            raise PlaceHolderSeriesError(
+                f"The placeholder ('{placeholder}') must be in the last part of the pattern "
+                f"(file or folder name), not in {Path(pattern).parent}."
+            )
         self._regex = self._build_regex()
-        self._width = self._find_width()
 
     def __repr__(self) -> str:
         return (
@@ -148,7 +181,8 @@ class PlaceholderSeries:
         """
         return str(Path(self.pattern).parent)
 
-    def _find_width(self) -> int:
+    @property
+    def _width(self) -> int:
         """
         Determine the width of the numeric field.
 
@@ -160,16 +194,9 @@ class PlaceholderSeries:
         int
             Number of digits used for zero-padding.
         """
-        widths = []
-        if not os.path.isdir(self.folder):
-            return 1
-        for name in os.listdir(self.folder):
-            match = self._regex.match(name)
-            if match:
-                widths.append(len(match.group(1)))
-        return max(widths) if widths else 1
+        return max((len(d) for d in self._digits().values()), default=1)
 
-    @cached_property
+    @property
     def values(self) -> List[int]:
         """
         Extract all integer values matching the placeholder pattern.
@@ -190,15 +217,39 @@ class PlaceholderSeries:
         Returns:
 
             [5, 10]
+
+        Notes
+        -----
+        The folder is read at each call, so files written in the
+        meantime are found.
         """
-        values = []
+        return sorted(self._digits())
+
+    def _digits(self) -> Dict[int, str]:
+        """
+        Map each integer value to the digits written in the matching
+        file/folder name (e.g. ``{1: "1", 10: "10"}`` or ``{1: "000001"}``),
+        reading the folder.
+
+        Raises
+        ------
+        PlaceHolderSeriesError
+            If two names give the same value (e.g. ``1.txt`` and ``01.txt``).
+        """
+        digits = {}
         if not os.path.isdir(self.folder):
-            return values
+            return digits
         for name in os.listdir(self.folder):
             match = self._regex.match(name)
             if match:
-                values.append(int(match.group(1)))
-        return sorted(values)
+                value = int(match.group(1))
+                if value in digits:
+                    raise PlaceHolderSeriesError(
+                        f"Value {value} found twice in {self.folder}: "
+                        f"'{digits[value]}' and '{match.group(1)}'."
+                    )
+                digits[value] = match.group(1)
+        return digits
 
     @property
     def names(self) -> List[str]:
@@ -211,7 +262,7 @@ class PlaceholderSeries:
             Sorted names corresponding to the discovered placeholder
             values.
         """
-        return [os.path.basename(self.get_path(v)) for v in self.values]
+        return [Path(path).name for path in self.paths]
 
     @property
     def paths(self) -> List[str]:
@@ -224,21 +275,26 @@ class PlaceholderSeries:
             Sorted absolute or relative paths corresponding to the
             discovered placeholder values.
         """
-        return [self.get_path(v) for v in self.values]
+        digits = self._digits()
+        return [
+            self.pattern.replace(self.placeholder, digits[v]) for v in sorted(digits)
+        ]
 
     @property
     def first(self) -> str | None:
         """
         Return the first path in the series.
         """
-        return self.paths[0] if self.paths else None
+        paths = self.paths
+        return paths[0] if paths else None
 
     @property
     def last(self) -> str | None:
         """
         Return the last path in the series.
         """
-        return self.paths[-1] if self.paths else None
+        paths = self.paths
+        return paths[-1] if paths else None
 
     def exists(self, value: int) -> bool:
         """
@@ -271,10 +327,15 @@ class PlaceholderSeries:
 
         Notes
         -----
-        The numeric value is zero-padded using the width inferred from
-        existing matching files/folders.
+        For an existing value, the digits of the existing file/folder
+        name are used. Otherwise the numeric value is zero-padded using
+        the width inferred from existing matching files/folders.
         """
-        replacement = str(value).zfill(self._width)
+        digits = self._digits()
+        if value in digits:
+            replacement = digits[value]
+        else:
+            replacement = str(value).zfill(self._width)
         return self.pattern.replace(self.placeholder, replacement)
 
 
@@ -296,7 +357,7 @@ class BaseSeriesReader(ABC):
     generic implementations based on these two operations.
     """
 
-    __version__ = "1.0.0"
+    __version__ = "1.1.0"
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}()"
@@ -337,8 +398,20 @@ class BaseSeriesReader(ABC):
         -------
         List
             List containing the result of reading each file.
+
+        Raises
+        ------
+        BaseSeriesReaderError
+            If no file of the series is found.
         """
-        return [self.read(path) for path in series.paths]
+        paths = list(series.paths)
+        if len(paths) == 0:
+            if not os.path.isdir(series.folder):
+                raise BaseSeriesReaderError(f"Folder not found: {series.folder}.")
+            raise BaseSeriesReaderError(
+                f"No file matching '{Path(series.pattern).name}' found in {series.folder}."
+            )
+        return [self.read(path) for path in paths]
 
     def merge(self, data):
         """
@@ -512,8 +585,9 @@ class ASEReader(BaseSeriesReader):
 
         Parameters
         ----------
-        data : List[List[Atoms]]
-            Structures returned by reading multiple files.
+        data : List[List[Atoms]] or List[Atoms]
+            Structures returned by reading multiple files. With an
+            integer ``index``, each file gives a single ``Atoms``.
 
         Returns
         -------
@@ -523,7 +597,10 @@ class ASEReader(BaseSeriesReader):
         """
         all_atoms = []
         for traj in data:
-            all_atoms.extend(traj)
+            if isinstance(traj, list):
+                all_atoms.extend(traj)
+            else:
+                all_atoms.append(traj)
         return all_atoms
 
 
@@ -579,13 +656,27 @@ class LammpsDumpReader(BaseSeriesReader):
         -------
         Atoms or List[Atoms]
             Parsed ASE structure(s).
+
+        Raises
+        ------
+        BaseSeriesReaderError
+            If the dump cannot be read (e.g. ``Z_of_type`` missing for a
+            ``type`` column, no position columns) or no structure is selected.
         """
         _require_ase()
-        return parse_lammps_dump(
-            path,
-            self.Z_of_type,
-            self.index_atom,
-        )
+        try:
+            atoms = parse_lammps_dump(
+                path,
+                self.Z_of_type,
+                self.index_atom,
+            )
+        except ValueError as exc:
+            raise BaseSeriesReaderError(f"{path}: {exc}") from exc
+        if len(atoms) == 0:
+            raise BaseSeriesReaderError(
+                f"No structure read in {path} with index_atom={self.index_atom!r}."
+            )
+        return atoms
 
     def merge(self, data) -> List[Atoms]:
         """
@@ -635,40 +726,55 @@ class LammpsLogReader(BaseSeriesReader):
         Returns
         -------
         pandas.DataFrame
-            DataFrame containing:
+            DataFrame with the columns of the ``Step ...`` header
+            (e.g. Step, Temp, PotEng, KinEng, TotEng, Press).
 
-            - Step
-            - Temp
-            - PotEng
-            - KinEng
-            - TotEng
-            - Press
+            If the log contains several runs, their tables are
+            concatenated (missing columns are NaN). Text lines inside a
+            table (WARNING, SHAKE stats, ...) are skipped.
+
+        Raises
+        ------
+        BaseSeriesReaderError
+            If no thermo table is found, if LAMMPS wrote an ERROR, or
+            if a table is not closed by ``Loop time`` (crashed run).
         """
         with open(path) as f:
             lines = f.readlines()
-        reading = False
+        tables = []
+        columns = None
         data = []
-        for line in lines:
-            if "Step" in line:
-                reading = True
+        for i, line in enumerate(lines, start=1):
+            words = line.split()
+            if words[:1] == ["Step"]:
+                columns = words
+                data = []
                 continue
-            if "Loop" in line:
-                break
-            if reading:
-                data.append(line.strip().split())
+            if columns is None:
+                continue
+            if words[:1] == ["Loop"]:
+                tables.append(pd.DataFrame(data, columns=columns, dtype=float))
+                columns = None
+                continue
+            if line.startswith("ERROR"):
+                raise BaseSeriesReaderError(f"LAMMPS error in {path}: {line.strip()}")
+            if not words or not _is_number(words[0]):
+                ## WARNING, SHAKE stats, ... lines inside the table.
+                continue
+            if len(words) != len(columns):
+                raise BaseSeriesReaderError(
+                    f"Line {i} of {path} has {len(words)} values "
+                    f"for {len(columns)} columns: {line.strip()}"
+                )
+            data.append(words)
+        if columns is not None:
+            raise BaseSeriesReaderError(
+                f"Thermo table not closed by 'Loop time' in {path} (crashed run?)."
+            )
+        if not tables:
+            raise BaseSeriesReaderError(f"No thermo table (Step ... Loop) in {path}.")
 
-        return pd.DataFrame(
-            data,
-            columns=[
-                "Step",
-                "Temp",
-                "PotEng",
-                "KinEng",
-                "TotEng",
-                "Press",
-            ],
-            dtype=float,
-        )
+        return pd.concat(tables, ignore_index=True)
 
     def merge(self, data) -> pd.DataFrame:
         """
@@ -687,22 +793,13 @@ class LammpsLogReader(BaseSeriesReader):
 
         Notes
         -----
-        For every DataFrame after the first, the ``Step`` column
-        is shifted by the final step of the already concatenated
-        data. This produces a continuous step sequence across
-        multiple simulations.
+        When a DataFrame starts at a step lower than the final step of
+        the already concatenated data (the run restarted its step count,
+        e.g. ``read_data``), its ``Step`` column is shifted to continue
+        from that final step. Runs that already continue the step count
+        (e.g. ``read_restart``) are kept as they are.
         """
-        result = pd.DataFrame()
-        for df in data:
-            if not result.empty:
-                last_step = result["Step"].iloc[-1]
-                df = df.copy()
-                df["Step"] += last_step
-            result = pd.concat(
-                [result, df],
-                ignore_index=True,
-            )
-        return result
+        return _continue_steps(data, "Step")
 
 
 class FunctionReader(BaseSeriesReader):
@@ -731,6 +828,8 @@ class FunctionReader(BaseSeriesReader):
         ...
         >>> reader = FunctionReader(read_my_file)
         """
+        if not callable(read_function):
+            raise TypeError("read_function must be callable.")
         self.read_function = read_function
 
     def __repr__(self) -> str:
@@ -795,6 +894,14 @@ class ThermoLogReader(BaseSeriesReader):
         with open(path, "r") as f:
             header = f.readline().strip()
         columns = header.lstrip("#").split()
+        required = ["E_pot(eV)", "E_kin(eV)"]
+        if self.timestep_fs is not None:
+            required.append("step")
+        missing = [c for c in required if c not in columns]
+        if missing:
+            raise BaseSeriesReaderError(
+                f"Missing column(s) {missing} in the header of {path}: {header!r}."
+            )
         df = pd.read_csv(
             path,
             sep=r"\s+",
@@ -808,17 +915,7 @@ class ThermoLogReader(BaseSeriesReader):
         return df
 
     def merge(self, data) -> pd.DataFrame:
-        result = pd.DataFrame()
-        for df in data:
-            if not result.empty:
-                last_step = result["step"].iloc[-1]
-                df = df.copy()
-                df["step"] += last_step
-            result = pd.concat(
-                [result, df],
-                ignore_index=True,
-            )
-        return result
+        return _continue_steps(data, "step")
 
 
 class PymatgenReader(FunctionReader):
@@ -845,8 +942,6 @@ class PymatgenReader(FunctionReader):
             ``read_function``.
         """
         _require_pymatgen()
-        if not callable(read_function):
-            raise TypeError("read_function must be callable.")
         super().__init__(read_function)
         self.kwargs = kwargs
 

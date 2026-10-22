@@ -26,7 +26,7 @@ from .series_reader import (
     ThermoLogReader,
 )
 
-from .utils import check_folder, variable_to_string
+from .utils import check_folder, check_folder_parallel, variable_to_string
 
 
 from .exception import (
@@ -68,5 +68,6 @@ __all__ = [
     "BaseSeriesReaderError",
     ## Utils functions
     "check_folder",
+    "check_folder_parallel",
     "variable_to_string",
 ]

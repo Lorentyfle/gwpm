@@ -1,4 +1,7 @@
-from typing import List, Union, Any
+from typing import Iterable, List, Union, Any
+from concurrent.futures import ThreadPoolExecutor
+import math
+import os
 import warnings
 
 import numpy as np
@@ -58,8 +61,10 @@ def parse_index_option(index: int, timesteps: list) -> list:
     >>> parse_index_option("::2", [10, 20, 30, 40])
     [10, 30]
     """
+    if isinstance(index, str) and ":" not in index:
+        index = int(index)  # "-1" is the same as -1, not a slice.
     if isinstance(index, int):  # Direct integer index
-        return [timesteps[index]] if index < len(timesteps) else []
+        return [timesteps[index]] if -len(timesteps) <= index < len(timesteps) else []
     elif isinstance(index, str):
         return timesteps[slice(*map(lambda x: int(x) if x else None, index.split(":")))]
     return []
@@ -172,10 +177,6 @@ def parse_lammps_dump(
     10
     """
     _require_ase()
-    # Initialize variables
-    positions = []
-    symbols = []
-    box_bounds = []
     atom_array = []
     #
     with open(file_path, "r") as f:
@@ -192,16 +193,17 @@ def parse_lammps_dump(
     structure_sizes = detect_structure_size(
         file_path
     )  # Auto-detect sizes per structure
-    selected_positions = parse_index_option(index, timesteps)
+    ## Select the structures by their number, so the size of each one is used.
+    selected_structures = parse_index_option(index, list(range(len(timesteps))))
     with open(file_path, "r") as f:
-        for i, pos in enumerate(selected_positions):
+        for i in selected_structures:
             ## Find the position to take data.
-            f.seek(pos)
+            f.seek(timesteps[i])
             ## mode = 0 : Nothing. mode = 1 : Box bounds. mode = 2 : Atoms.
             mode = 0
-            # current_structure = [f.readline()]
+            box_bounds = []
             atom_lines = []
-            for _ in range(structure_sizes[i] - 1):  # Use detected size per structure
+            for _ in range(structure_sizes[i] - 1):  # Use the size of this structure
                 # Take the line of the file
                 line = f.readline()
                 # Take the good boxbounds
@@ -215,19 +217,28 @@ def parse_lammps_dump(
                     #
                     headers = line.strip().split()[2:]  # Skip "ITEM: ATOMS"
                     col_index = {key: idx for idx, key in enumerate(headers)}
-                    # Identify if a new data needs to be added
-                    ## Forces
-                    fx_idx = col_index.get("fx")
-                    fy_idx = col_index.get("fy")
-                    fz_idx = col_index.get("fz")
-                    #
-                    has_forces = (
-                        fx_idx is not None and fy_idx is not None and fz_idx is not None
-                    )
-                    #
-                    if has_forces:  # Declare it only if useful.
-                        forces = []
-                    ##
+                    ## Positions: unwrapped, wrapped or scaled (fraction of the cell).
+                    for position_columns, scaled in (
+                        (("xu", "yu", "zu"), False),
+                        (("x", "y", "z"), False),
+                        (("xsu", "ysu", "zsu"), True),
+                        (("xs", "ys", "zs"), True),
+                    ):
+                        if all(c in col_index for c in position_columns):
+                            position_idx = [col_index[c] for c in position_columns]
+                            break
+                    else:
+                        raise ValueError(
+                            f"No position columns (x/xu/xs/xsu y z) in: {' '.join(headers)}."
+                        )
+                    ## Elements: from the element column, or from the type with the mapping.
+                    if "element" not in col_index:
+                        if "type" not in col_index:
+                            raise ValueError("No 'type' or 'element' column.")
+                        if element_mapping is None:
+                            raise ValueError(
+                                "Z_of_type must be given to read the 'type' column, e.g. {1: 'Li', 2: 'O'}."
+                            )
                     continue
                 elif "ITEM:" in line:
                     mode = 0
@@ -239,42 +250,75 @@ def parse_lammps_dump(
                 if mode == 2:
                     # Take atom lines.
                     data = line.split()
-                    atom_id = int(data[col_index["id"]])
-                    atom_type = int(data[col_index["type"]])
-                    x = float(data[col_index.get("xu", col_index.get("x"))])
-                    y = float(data[col_index.get("yu", col_index.get("y"))])
-                    z = float(data[col_index.get("zu", col_index.get("z"))])
-                    ## Non-required input
-                    if has_forces:
-                        fx = float(data[fx_idx])
-                        fy = float(data[fy_idx])
-                        fz = float(data[fz_idx])
-                        forces.append([fx, fy, fz])
+                    atom_id = (
+                        int(data[col_index["id"]])
+                        if "id" in col_index
+                        else len(atom_lines)
+                    )
+                    position = [float(data[idx]) for idx in position_idx]
                     #
-                    # Map atom types to elements using the input mapping
-                    element = element_mapping.get(atom_type)
-                    if not element:
-                        raise ValueError(
-                            f"Unknown atom type {atom_type}. Please update the element mapping."
-                        )
-                    atom_lines.append((atom_id, element, [x, y, z]))
+                    if "element" in col_index:
+                        element = data[col_index["element"]]
+                    else:
+                        # Map atom types to elements using the input mapping
+                        atom_type = int(data[col_index["type"]])
+                        element = element_mapping.get(atom_type)
+                        if not element:
+                            raise ValueError(
+                                f"Unknown atom type {atom_type}. Please update the element mapping."
+                            )
+                    atom_lines.append((atom_id, element, position))
             # Remake the order of the atoms
             # Sort by atom_id
             atom_lines.sort(key=lambda x: x[0])
             # Unpack sorted data
             symbols = [line[1] for line in atom_lines]
-            positions = [line[2] for line in atom_lines]
+            positions = np.array([line[2] for line in atom_lines]).reshape(-1, 3)
+            cell = _lammps_box_to_cell(box_bounds)
+            if scaled:
+                positions = positions @ cell
             # Create ASE Atoms object.
-            cell = np.array([bound[1] - bound[0] for bound in box_bounds])
             atom_array.append(
                 Atoms(symbols=symbols, positions=positions, cell=cell, pbc=True)
             )
-            # Free memory.
-            box_bounds = []  # Reset for the next block
-            positions = []  # Reset for the next block
-            symbols = []  # Reset for the next block
             #
     return atom_array
+
+
+def _lammps_box_to_cell(box_bounds: List[List[float]]) -> ndarray:
+    """
+    Convert the BOX BOUNDS of a LAMMPS dump into a cell matrix.
+
+    Parameters
+    ----------
+    box_bounds : List[List[float]]
+        Three lines ``lo hi`` (orthogonal box) or ``lo_bound hi_bound tilt``
+        (triclinic box, tilts xy, xz, yz).
+
+    Returns
+    -------
+    ndarray
+        3x3 cell matrix (rows are the cell vectors).
+    """
+    if len(box_bounds) != 3:
+        raise ValueError(f"BOX BOUNDS must have 3 lines, got {len(box_bounds)}.")
+    if all(len(bound) == 2 for bound in box_bounds):
+        return np.diag([bound[1] - bound[0] for bound in box_bounds])
+    ## Triclinic: the bounds include the tilts, see the LAMMPS dump documentation.
+    (xlo_b, xhi_b, xy), (ylo_b, yhi_b, xz), (zlo, zhi, yz) = box_bounds
+    xlo = xlo_b - min(0.0, xy, xz, xy + xz)
+    xhi = xhi_b - max(0.0, xy, xz, xy + xz)
+    ylo = ylo_b - min(0.0, yz)
+    yhi = yhi_b - max(0.0, yz)
+    if min(xhi - xlo, yhi - ylo, zhi - zlo) <= 0:
+        raise ValueError(f"Invalid triclinic BOX BOUNDS: {box_bounds}.")
+    return np.array(
+        [
+            [xhi - xlo, 0.0, 0.0],
+            [xy, yhi - ylo, 0.0],
+            [xz, yz, zhi - zlo],
+        ]
+    )
 
 
 ########
@@ -304,6 +348,79 @@ def check_folder(folder: Union[str, Path]) -> None:
     if not folder.is_dir():
         folder.mkdir(parents=True, exist_ok=True)
         print(f"Creating folder(s) following {folder}")
+
+
+def check_folder_parallel(
+    folders: Iterable[Union[str, Path]],
+    n_workers: int = 8,
+    verbose: bool = True,
+) -> int:
+    """
+    Ensure that many directories exist, creating them in parallel.
+
+    Every folder and its parents are created exactly once, one depth
+    level after the other, each level with ``n_workers`` threads. This
+    is useful on network filesystems (Lustre, NFS) where each creation
+    is a request to a metadata server.
+
+    Parameters
+    ----------
+    folders : Iterable[str or pathlib.Path]
+        Directory paths to verify. To create the folders of a
+        ``GeneralWorkPathManager``, use ``gwpm.create_folders()``:
+        ``gwpm.all_paths()`` also contains ``gwpm.file``, which would be
+        created as a folder.
+
+    n_workers : int, default=8
+        Number of threads. Keep it moderate (8-16) on shared HPC
+        filesystems, as many simultaneous creations load the metadata
+        server.
+
+    verbose : bool, default=True
+        Print the number of folders created.
+
+    Returns
+    -------
+    int
+        Number of folders created.
+
+    Raises
+    ------
+    FileExistsError
+        If one of the paths exists as a file.
+
+    Examples
+    --------
+    >>> check_folder_parallel(["./runs/Li/300K", "./runs/Li/600K"], n_workers=8)
+    Created 3 folder(s).
+    3
+    """
+    ## All the folders and their parents, once ("." and "/" always exist).
+    levels = {}
+    for folder in folders:
+        folder = Path(folder)
+        for path in (folder, *folder.parents):
+            if path == Path(".") or path == Path(path.anchor):
+                continue
+            levels.setdefault(len(path.parts), set()).add(path)
+
+    def make(path: Path) -> bool:
+        try:
+            os.mkdir(path)
+            return True
+        except FileExistsError:
+            if not path.is_dir():
+                raise
+            return False
+
+    created = 0
+    with ThreadPoolExecutor(max(1, n_workers)) as executor:
+        ## The parents (smaller depth) are created before their children.
+        for depth in sorted(levels):
+            created += sum(executor.map(make, sorted(levels[depth])))
+    if verbose:
+        print(f"Created {created} folder(s).")
+    return created
 
 
 def variable_to_string(
@@ -348,7 +465,9 @@ def variable_to_string(
         Separator used when formatting one-dimensional lists.
 
     trailing_zero : int, default=0
-        Minimum number of trailing digits or characters.
+        Minimum number of decimal digits of floats (zeros added on the
+        right). Strings are padded on the right to this width. Integers
+        are not changed.
 
     leading_zero : int, default=0
         Minimum width padded with leading zeros.
@@ -376,8 +495,8 @@ def variable_to_string(
 
     Examples
     --------
-    >>> variable_to_string(3.5, trailing_zero=2)
-    '3.50'
+    >>> variable_to_string(3.5, trailing_zero=3)
+    '3.500'
 
     >>> variable_to_string(True, mode="F90")
     '.TRUE.'
@@ -389,6 +508,12 @@ def variable_to_string(
     '1  2\\n3  4'
     """
     # Function implementation goes here
+    if isinstance(variable, str) and not (
+        leading_zero or trailing_zero or litteral_string
+    ):
+        return variable  # Nothing to format (most paths).
+    if isinstance(variable, np.generic):
+        variable = variable.item()  # numpy scalars as Python scalars.
     if isinstance(variable, (list, ndarray)):
         # We have a simple list
         if not all(isinstance(ele, (list, ndarray)) for ele in variable):
@@ -448,6 +573,18 @@ def variable_to_string(
         return ".TRUE." if variable else ".FALSE."
     if isinstance(variable, bool):
         return str(variable)
+    if isinstance(variable, (int, float)) and variable < 0:
+        # The zeros are added after the sign: -5 -> "-005".
+        return "-" + variable_to_string(
+            -variable,
+            mode=mode,
+            buffer_list_type=buffer_list_type,
+            trailing_zero=trailing_zero,
+            leading_zero=leading_zero,
+            float_trail=float_trail,
+            litteral_string=litteral_string,
+            force_float=force_float,
+        )
 
     # str and int/float must be after else the bool will not be taken care of.
     if isinstance(variable, str):
@@ -458,11 +595,12 @@ def variable_to_string(
         return trail_zero
 
     if isinstance(variable, int):
-        lead_zero = "{:0>{}}".format(variable, leading_zero)
-        trail_zero = "{:0<{}}".format(lead_zero, trailing_zero)
-        return trail_zero
+        # No decimal digits: trailing_zero does not apply.
+        return "{:0>{}}".format(variable, leading_zero)
 
     if isinstance(variable, float):
+        if math.isnan(variable) or math.isinf(variable):
+            return str(variable)
         # Float with exponent
         if str(variable).__contains__("e"):
             _, exponent = str(variable).split("e")
@@ -492,8 +630,10 @@ def variable_to_string(
             lead_zero = "{:0>{}}".format(int_part, leading_zero)
             trail_zero = "{}.{:0<{}}".format(lead_zero, float_part, trailing_zero)
         else:
+            _, float_part = str(variable).split(".")
             lead_zero = "{:0>{}}".format(variable, leading_zero)
-            trail_zero = "{:0<{}}".format(lead_zero, trailing_zero)
+            # trailing_zero is the number of decimal digits.
+            trail_zero = lead_zero + "0" * max(0, trailing_zero - len(float_part))
         return trail_zero
     if Cell is not None and isinstance(variable, Cell):
         # Special conversion of the Cell class from ASE into a string.

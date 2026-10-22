@@ -7,7 +7,7 @@ from gwpm.utils import (
     _numpy_to_list_recursive,
     parse_lammps_dump,
 )
-from gwpm import check_folder, variable_to_string
+from gwpm import check_folder, check_folder_parallel, variable_to_string
 import numpy as np
 from ase.cell import Cell
 
@@ -246,7 +246,7 @@ def test_variable_to_string_float_non_integer_with_padding():
         1.23,
         trailing_zero=6,
     )
-    assert result == "1.2300"
+    assert result == "1.230000"
 
 
 def test_variable_to_string_float_non_integer():
@@ -364,3 +364,77 @@ def test_check_folder_existing_folder(tmp_path, capsys):
 
     captured = capsys.readouterr()
     assert captured.out == ""
+
+
+#### Stress test fixes.
+@pytest.mark.parametrize(
+    "index, expected",
+    [("-1", [40]), ("2", [30]), (-4, [10]), (-5, []), (4, [])],
+)
+def test_parse_index_option_string_and_range(index, expected):
+    assert parse_index_option(index, [10, 20, 30, 40]) == expected
+
+
+@pytest.mark.parametrize(
+    "value, kwargs, expected",
+    [
+        (-5, {"leading_zero": 3}, "-005"),
+        (-0.5, {"leading_zero": 5}, "-000.5"),
+        (float("nan"), {}, "nan"),
+        (float("-inf"), {}, "-inf"),
+        (np.int64(5), {"leading_zero": 3}, "005"),
+        (np.float64(0.25), {}, "0.25"),
+        (np.bool_(True), {}, "True"),
+    ],
+)
+def test_variable_to_string_edge_values(value, kwargs, expected):
+    assert variable_to_string(value, **kwargs) == expected
+
+
+#### check_folder_parallel
+@pytest.mark.parametrize("n_workers", [1, 4, 32])
+def test_check_folder_parallel_creates_all(tmp_path, capsys, n_workers):
+    folders = [tmp_path / a / b / c for a in "ab" for b in "cd" for c in "ef"]
+
+    created = check_folder_parallel(folders, n_workers=n_workers)
+
+    assert created == 2 + 4 + 8
+    assert all(folder.is_dir() for folder in folders)
+    assert capsys.readouterr().out == "Created 14 folder(s).\n"
+
+
+def test_check_folder_parallel_existing_and_duplicates(tmp_path):
+    (tmp_path / "a").mkdir()
+    folders = [tmp_path / "a" / "b", str(tmp_path / "a" / "b"), tmp_path / "a"]
+
+    assert check_folder_parallel(folders, verbose=False) == 1
+    assert check_folder_parallel(folders, verbose=False) == 0
+
+
+def test_check_folder_parallel_relative(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    assert check_folder_parallel(["./x/y/", "x/z"], verbose=False) == 3
+    assert (tmp_path / "x" / "z").is_dir()
+
+
+def test_check_folder_parallel_file_in_the_way(tmp_path):
+    (tmp_path / "a").touch()
+
+    with pytest.raises(FileExistsError):
+        check_folder_parallel([tmp_path / "a" / "b"], verbose=False)
+
+
+@pytest.mark.parametrize(
+    "value, trailing_zero, expected",
+    [
+        (1.23, 3, "1.230"),
+        (1.2345, 2, "1.2345"),
+        (1.0, 3, "1.000"),
+        (-0.5, 3, "-0.500"),
+        (5, 3, "5"),
+        ([0.5, 2], 2, "0.50 2"),
+    ],
+)
+def test_variable_to_string_trailing_zero_is_decimals(value, trailing_zero, expected):
+    assert variable_to_string(value, trailing_zero=trailing_zero) == expected
